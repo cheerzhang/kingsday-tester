@@ -1,8 +1,7 @@
 {
   "players": [
     "role_finn",
-    "role_tourist",
-    "role_vendor"
+    "role_tourist"
   ],
   "game_over": true,
   "game_over_reason": "event_game_over",

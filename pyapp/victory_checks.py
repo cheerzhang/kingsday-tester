@@ -149,25 +149,3 @@ VICTORY_REGISTRY = {
     "take_n_photo": take_n_photo,
     "vendor_trade_dynamic": vendor_trade_dynamic,
 }
-
-def check_victory(role_obj: dict) -> bool:
-    """
-    role_obj must contain:
-      role_obj["id"]
-      role_obj["victory"] = { "id": "...", "params": {...} }
-    Returns True/False.
-    """
-    role_id = str(role_obj.get("id", "")).strip()
-    victory = role_obj.get("victory")
-    if not role_id or not isinstance(victory, dict):
-        return False
-
-    vid = str(victory.get("id", "")).strip()
-    params = victory.get("params", {})
-
-    fn = VICTORY_REGISTRY.get(vid)
-    if not fn:
-        return False
-
-    # fn(role_id, params) -> bool
-    return bool(fn(role_id, params))
