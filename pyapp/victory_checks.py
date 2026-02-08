@@ -114,33 +114,6 @@ def vendor_trade_dynamic(role_id: str, params: dict) -> bool:
 
     return (trades_done >= target_trades) and (unique_count >= target_unique)
 
-def record_vendor_trade(vendor_role_id: str, partner_role_id: str) -> None:
-    """
-    Call when vendor completes 1 trade with partner.
-    Updates vendor gamestate counters:
-      trades_done += 1
-      trade_partners add partner (unique)
-    """
-    gs = load_gamestate(vendor_role_id)
-    counters = gs.get("counters")
-    if not isinstance(counters, dict):
-        counters = {}
-        gs["counters"] = counters
-
-    counters["trades_done"] = int(counters.get("trades_done", 0) or 0) + 1
-
-    partners = counters.get("trade_partners", [])
-    if not isinstance(partners, list):
-        partners = []
-    if partner_role_id and partner_role_id != vendor_role_id and partner_role_id not in partners:
-        partners.append(partner_role_id)
-    counters["trade_partners"] = partners
-
-    try:
-        with open(gamestate_path(vendor_role_id), "w", encoding="utf-8") as f:
-            json.dump(gs, f, ensure_ascii=False, indent=2)
-    except Exception:
-        pass
 # ======================
 # Registry / dispatcher
 # ======================
