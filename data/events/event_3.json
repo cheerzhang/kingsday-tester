@@ -2,7 +2,8 @@
   "id": "event_orange_crown",
   "name": "橙色围巾",
   "global_effect": {
-    "id": "all_role_stat_plus",
+    "id": "current_player_stat_plus",
+    "label": "当前玩家获得 1 件橙色物品",
     "params": {
       "amount": 1,
       "stat": "curiosity"
@@ -12,21 +13,14 @@
   "role_effects": {
     "role_finn": {
       "type": "simple_effect",
-      "id": "current_player_stat_plus",
-      "params": {
-        "stat": "orange_product",
-        "amount": 1
-      }
+      "id": "finn_wear_orange_no_cost",
+      "params": {}
     },
     "role_tourist": {
       "type": "interactive_action",
-      "id": "try_take_photo",
-      "params": { "photo": 1 }
+      "id": "tourist_wear_then_photo",
+      "params": {}
     },
-    "role_vendor": {
-      "type": "interactive_action",
-      "id": "try_trade",
-      "params": { "photo": 1 }
-    }
+    "role_vendor": null
   }
 }

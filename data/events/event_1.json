@@ -3,6 +3,7 @@
   "name": "全城橙色",
   "global_effect": {
     "id": "all_role_stat_plus",
+    "label": "所有玩家的好奇心 +1",
     "params": {
       "amount": 1,
       "stat": "curiosity"

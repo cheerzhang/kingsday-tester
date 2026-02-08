@@ -42,9 +42,13 @@ class SetupTab(ttk.Frame):
         box.pack(fill="x", pady=(12, 10))
         self.roles_box = box
 
-        # ----- status table -----
-        table_box = ttk.LabelFrame(self, text="Game Status", padding=10)
-        table_box.pack(fill="both", expand=True)
+        # ----- mid layout: status (left) + current card (right) -----
+        mid = ttk.Frame(self)
+        mid.pack(fill="both", expand=True)
+
+        # ----- status table (left) -----
+        table_box = ttk.LabelFrame(mid, text="Game Status", padding=10)
+        table_box.pack(side="left", fill="both", expand=True, padx=(0, 10))
 
         self.table = ttk.Treeview(table_box, columns=("role", "status"), show="headings", height=10)
         self.table.heading("role", text="Role")
@@ -52,6 +56,21 @@ class SetupTab(ttk.Frame):
         self.table.column("role", width=200, anchor="w")
         self.table.column("status", width=800, anchor="w")
         self.table.pack(fill="both", expand=True)
+
+        # ----- current card (right) -----
+        card_box = ttk.LabelFrame(mid, text="Current Card", padding=10)
+        card_box.pack(side="right", fill="y")
+
+        self.card_id_var = tk.StringVar(value="None")
+        self.card_name_var = tk.StringVar(value="None")
+        self.card_label_var = tk.StringVar(value="None")
+
+        ttk.Label(card_box, text="Card ID:", font=("Arial", 11, "bold")).pack(anchor="w")
+        ttk.Label(card_box, textvariable=self.card_id_var).pack(anchor="w", pady=(0, 8))
+        ttk.Label(card_box, text="Card Name:", font=("Arial", 11, "bold")).pack(anchor="w")
+        ttk.Label(card_box, textvariable=self.card_name_var).pack(anchor="w", pady=(0, 8))
+        ttk.Label(card_box, text="Global Effect:", font=("Arial", 11, "bold")).pack(anchor="w")
+        ttk.Label(card_box, textvariable=self.card_label_var, wraplength=260).pack(anchor="w")
 
         # ----- current turn panel -----
         turn_box = ttk.LabelFrame(self, text="Current Player", padding=10)
@@ -220,6 +239,9 @@ class SetupTab(ttk.Frame):
             self.table.delete(i)
         self.turn_title_var.set("(not started)")
         self.turn_detail_var.set("")
+        self.card_id_var.set("None")
+        self.card_name_var.set("None")
+        self.card_label_var.set("None")
         try:
             self.log_text.delete("1.0", "end")
         except Exception:
@@ -265,6 +287,18 @@ class SetupTab(ttk.Frame):
             st = {}
         detail = ", ".join([f"{k}={st.get(k,0)}" for k in sorted(st.keys())])
         self.turn_detail_var.set(detail)
+
+        # update current card display (show until turn ends)
+        ce = getattr(self.flow, "current_event_info", None)
+        if isinstance(ce, dict):
+            self.card_id_var.set(ce.get("id") or "None")
+            self.card_name_var.set(ce.get("name") or "None")
+            lab = ce.get("global_label") or "None"
+            self.card_label_var.set(lab)
+        else:
+            self.card_id_var.set("None")
+            self.card_name_var.set("None")
+            self.card_label_var.set("None")
         # =========================================================
         # 2) 显示按钮（这里就是你要找的“显示按钮的那部分”）
         #    - 互动流程（拍照/交易）优先显示对应按钮

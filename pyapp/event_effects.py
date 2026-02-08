@@ -130,6 +130,32 @@ def apply_finn_wear_costs_and_progress(actor_id: str) -> tuple[bool, str]:
     add_status(actor_id, "progress", 1)
     return (True, "")
 
+def apply_finn_wear_no_cost(*, actor_id: str) -> None:
+    add_status(actor_id, "orange_wear_product", 1)
+    add_status(actor_id, "progress", 1)
+
+def apply_photo_progress_only(*, actor_id: str, target_id: str) -> None:
+    # progress +1 for actor (tourist)
+    add_status(actor_id, "progress", 1)
+    # optional counters: photo +1, record target
+    gs = load_role_gamestate(actor_id)
+    counters = gs.get("counters")
+    if not isinstance(counters, dict):
+        counters = {}
+        gs["counters"] = counters
+    try:
+        cur = int(counters.get("photo", 0))
+    except Exception:
+        cur = 0
+    counters["photo"] = cur + 1
+    targets = counters.get("photo_targets")
+    if not isinstance(targets, list):
+        targets = []
+    if target_id and target_id not in targets:
+        targets.append(target_id)
+    counters["photo_targets"] = targets
+    save_role_gamestate(actor_id, gs)
+
 # ======================
 # Global effect functions
 # ======================
@@ -371,6 +397,29 @@ def try_take_photo_start(*, actor_id: str, players: list[str], params: dict | No
     payload = {"targets": targets}
     return ("need_target", payload, pending)
 
+def wear_then_photo_start(*, actor_id: str, players: list[str], params: dict | None = None):
+    """
+    Step 1: choose any target (excluding actor), then wear + photo consent.
+    Returns: (kind, payload, pending)
+    """
+    params = params if isinstance(params, dict) else {}
+    if not isinstance(players, list):
+        players = []
+    targets = [rid for rid in players if rid and rid != actor_id]
+    if not targets:
+        return ("fail", {"reason": "no_targets"}, None)
+    pending = {
+        "type": "try_take_photo",
+        "stage": "choose_target",
+        "actor_id": actor_id,
+        "targets": targets,
+        "target_id": None,
+        "params": params,
+        "pre_action": "wear_target",
+    }
+    payload = {"targets": targets}
+    return ("need_target", payload, pending)
+
 
 def try_take_photo_choose_target(*, pending: dict, target_id: str):
     """
@@ -385,6 +434,21 @@ def try_take_photo_choose_target(*, pending: dict, target_id: str):
     targets = pending.get("targets", [])
     if not isinstance(targets, list) or target_id not in targets:
         return ("need_target", {"targets": targets, "error": "invalid_target"}, pending)
+
+    # optional pre-action before consent
+    if pending.get("pre_action") == "wear_target":
+        actor_id = pending.get("actor_id")
+        if not actor_id:
+            return ("fail", {"reason": "missing_actor"}, None)
+        actor_gs = load_role_gamestate(actor_id)
+        if _get_status_int(actor_gs, "orange_product") < 1:
+            return ("done", {"ok": False, "reason": "need_orange_product"}, None)
+        add_status(actor_id, "orange_product", -1)
+        if target_id == "role_finn":
+            apply_finn_wear_no_cost(actor_id=target_id)
+        else:
+            add_status(target_id, "orange_wear_product", 1)
+        pending.pop("pre_action", None)
 
     pending["target_id"] = target_id
     pending["stage"] = "need_consent"
@@ -899,6 +963,23 @@ def apply_price_multiplier_global(*, factor: int):
     gts["price_mod"] = max(1, cur * int(factor))
     save_current_game(g)
 
+def apply_vendor_orange_price_bonus(*, vendor_id: str, delta: int):
+    gs = load_role_gamestate(vendor_id)
+    trade_state = gs.get("trade_state")
+    if not isinstance(trade_state, dict):
+        trade_state = {}
+        gs["trade_state"] = trade_state
+    override = trade_state.get("price_override")
+    if not isinstance(override, dict):
+        override = {}
+        trade_state["price_override"] = override
+    try:
+        cur = int(override.get("orange_product", 2))
+    except Exception:
+        cur = 2
+    override["orange_product"] = max(1, cur + int(delta))
+    save_role_gamestate(vendor_id, gs)
+
 # =========================
 # Role-card effect registry
 # =========================
@@ -987,3 +1068,36 @@ def rc_finn_wear_orange_plus_curiosity(*, actor_id: str, params: dict, players=N
     # extra effect: curiosity +1
     add_status(actor_id, "curiosity", 1)
     return ("done", {"ok": True, "effect": "finn_wear_orange_plus_curiosity"}, None)
+
+@register_rolecard_effect("tourist_gift_finn_wear_and_photo")
+def rc_tourist_gift_finn_wear_and_photo(*, actor_id: str, params: dict, players=None):
+    players = players if isinstance(players, list) else []
+    if "role_finn" not in players:
+        return ("done", {"ok": False, "reason": "finn_not_in_game"}, None)
+
+    actor_gs = load_role_gamestate(actor_id)
+    if _get_status_int(actor_gs, "orange_product") < 1:
+        return ("done", {"ok": False, "reason": "need_orange_product"}, None)
+
+    # actor gives one orange product to Finn (no gate, no stamina cost)
+    add_status(actor_id, "orange_product", -1)
+    apply_finn_wear_no_cost(actor_id="role_finn")
+
+    # immediate photo success (no money/stamina cost)
+    apply_photo_progress_only(actor_id=actor_id, target_id="role_finn")
+    return ("done", {"ok": True, "effect": "tourist_gift_finn_wear_and_photo"}, None)
+
+@register_rolecard_effect("vendor_orange_price_plus_2")
+def rc_vendor_orange_price_plus_2(*, actor_id: str, params: dict, players=None):
+    apply_vendor_orange_price_bonus(vendor_id=actor_id, delta=2)
+    return ("done", {"ok": True, "effect": "vendor_orange_price_plus_2"}, None)
+
+@register_rolecard_effect("finn_wear_orange_no_cost")
+def rc_finn_wear_orange_no_cost(*, actor_id: str, params: dict, players=None):
+    apply_finn_wear_no_cost(actor_id=actor_id)
+    return ("done", {"ok": True, "effect": "finn_wear_orange_no_cost"}, None)
+
+@register_rolecard_effect("tourist_wear_then_photo")
+def rc_tourist_wear_then_photo(*, actor_id: str, params: dict, players=None):
+    players = players if isinstance(players, list) else []
+    return wear_then_photo_start(actor_id=actor_id, players=players, params=params)

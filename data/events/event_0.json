@@ -3,6 +3,7 @@
   "name": "国王节快乐",
   "global_effect": {
     "id": "game_end_immediately",
+    "label": "游戏立刻结束",
     "params": {}
   }
 }

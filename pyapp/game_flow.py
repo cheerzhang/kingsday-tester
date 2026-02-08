@@ -70,6 +70,7 @@ class GameFlow:
         self.players: list[str] = []
         self.turn_index: int = 0
         self.logs: list[str] = []
+        self.current_event_info = None
 
         # OR draw: waiting for player choice
         self.pending_cost_choice = None
@@ -133,6 +134,7 @@ class GameFlow:
 
     def end_turn(self):
         self.log_all_player_status() # 🔍 回合结束时，统一打印所有玩家状态
+        self.current_event_info = None
         self.turn_index += 1
         if self.turn_index >= len(self.players):
             self.turn_index = 0
@@ -365,10 +367,20 @@ class GameFlow:
         result = self.draw_random_event_and_log(current_player_id)
         if not result:
             self.logs.append("[EVENT] draw failed.")
+            self.current_event_info = None
             return self.end_turn()
         ev = result["event"]
         effect_id = result["global_effect_id"]
         params = result["global_params"]
+        ge = ev.get("global_effect", {})
+        label = ""
+        if isinstance(ge, dict):
+            label = str(ge.get("label", "")).strip()
+        self.current_event_info = {
+            "id": str(ev.get("id", "")).strip(),
+            "name": str(ev.get("name", "")).strip(),
+            "global_label": label,
+        }
         run_global_effect(
             effect_id,
             params,
