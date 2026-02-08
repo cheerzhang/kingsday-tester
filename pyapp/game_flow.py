@@ -11,6 +11,7 @@ from core_logic import (
     update_winrate,
     save_gamestate,
 )
+from victory_checks import VICTORY_REGISTRY
 from event_effects import (
     run_global_effect, save_current_game,
     run_rolecard_effect,
@@ -135,6 +136,15 @@ class GameFlow:
     def end_turn(self):
         self.log_all_player_status() # 🔍 回合结束时，统一打印所有玩家状态
         self.current_event_info = None
+        try:
+            cur = load_current_game()
+            if isinstance(cur, dict) and "last_event_context" in cur:
+                del cur["last_event_context"]
+                save_current_game(cur)
+        except Exception:
+            pass
+        if self._check_victory_and_mark_winners():
+            return self.game_end()
         self.turn_index += 1
         if self.turn_index >= len(self.players):
             self.turn_index = 0
@@ -557,6 +567,39 @@ class GameFlow:
                 best_ids.append(rid)
 
         return best_ids
+
+    def _check_victory_and_mark_winners(self) -> bool:
+        winners: list[str] = []
+        for rid in self.players:
+            role = load_role_by_id(rid)
+            victory = role.get("victory")
+            if not isinstance(victory, dict):
+                continue
+            vid = str(victory.get("id", "")).strip()
+            params = victory.get("params", {}) if isinstance(victory.get("params"), dict) else {}
+            fn = VICTORY_REGISTRY.get(vid)
+            if not fn:
+                continue
+            try:
+                if fn(rid, params):
+                    winners.append(rid)
+            except Exception:
+                continue
+
+        if not winners:
+            return False
+
+        # mark winners in gamestate so calc_winners() picks them
+        for rid in winners:
+            gs = load_player_gamestate(rid)
+            gs["win_game"] = True
+            save_gamestate(rid, gs)
+
+        cur = load_current_game()
+        cur["game_over"] = True
+        cur["game_over_reason"] = "victory"
+        save_current_game(cur)
+        return True
     
     def skip_role_effect(self):
         self.pending_role_effect = None
@@ -616,6 +659,15 @@ class GameFlow:
                     "role_id": actor_id,
                     "role_name": load_role_by_id(actor_id).get("name", actor_id),
                     "ui_mode": "PHOTO_NEED_TARGET",
+                    "targets": payload.get("targets", []),
+                }
+            # ---- need_wear_target: UI 显示穿戴目标按钮 ----
+            if kind == "need_wear_target":
+                self.pending_interactive = pending
+                return {
+                    "role_id": actor_id,
+                    "role_name": load_role_by_id(actor_id).get("name", actor_id),
+                    "ui_mode": "WEAR_NEED_TARGET",
                     "targets": payload.get("targets", []),
                 }
 

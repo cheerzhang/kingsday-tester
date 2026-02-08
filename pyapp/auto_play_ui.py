@@ -240,6 +240,12 @@ class AutoPlayTab(ttk.Frame):
                 return self.flow.end_turn()
             target_id = random.choice(list(targets))
             return self.flow.photo_choose_target(target_id)
+        if ui_mode == "WEAR_NEED_TARGET":
+            targets = info.get("targets", [])
+            if not targets:
+                return self.flow.end_turn()
+            target_id = random.choice(list(targets))
+            return self.flow.photo_choose_target(target_id)
 
         if ui_mode == "PHOTO_NEED_CONSENT":
             agree = random.choice([True, False])

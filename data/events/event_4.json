@@ -1,0 +1,29 @@
+{
+  "id": "event_orange_4",
+  "name": "橙色皇冠 4",
+  "global_effect": {
+    "id": "current_and_lowest_curiosity_plus",
+    "label": "抽卡者与好奇心最低的玩家好奇心 +1",
+    "params": {}
+  },
+  "role_effects": {
+    "role_finn": {
+      "type": "simple_effect",
+      "id": "finn_bonus_orange_if_wearing",
+      "params": {},
+      "label": "若已穿至少 1 件橙色物品，则再获得 1 件橙色物品"
+    },
+    "role_tourist": {
+      "type": "interactive_action",
+      "id": "tourist_photo_lowest_curiosity",
+      "params": {},
+      "label": "对好奇心最低且已穿橙色物品的玩家发起拍照（不可拒绝）"
+    },
+    "role_vendor": {
+      "type": "interactive_action",
+      "id": "vendor_trade_lowest_curiosity",
+      "params": {},
+      "label": "与好奇心最低的玩家发起交易（不可拒绝）"
+    }
+  }
+}

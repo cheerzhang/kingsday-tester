@@ -57,6 +57,14 @@ def save_current_game(obj: dict):
     _ensure_runtime()
     save_json(GAME_FILE, obj)
 
+def set_last_event_context(ctx: dict):
+    g = load_current_game()
+    if isinstance(ctx, dict):
+        g["last_event_context"] = ctx
+    else:
+        g.pop("last_event_context", None)
+    save_current_game(g)
+
 def get_players_from_current_game():
     obj = load_current_game()
     players = obj.get("players", [])
@@ -91,6 +99,19 @@ def add_status(role_id: str, key: str, delta: int):
         val = 0
 
     st[key] = val
+    save_role_gamestate(role_id, gs)
+
+def _add_counter(role_id: str, key: str, delta: int):
+    gs = load_role_gamestate(role_id)
+    counters = gs.get("counters")
+    if not isinstance(counters, dict):
+        counters = {}
+        gs["counters"] = counters
+    try:
+        cur = int(counters.get(key, 0))
+    except Exception:
+        cur = 0
+    counters[key] = cur + int(delta)
     save_role_gamestate(role_id, gs)
 
 # ======================
@@ -128,11 +149,13 @@ def apply_finn_wear_costs_and_progress(actor_id: str) -> tuple[bool, str]:
     add_status(actor_id, "stamina", -1)
     add_status(actor_id, "orange_product", -1)
     add_status(actor_id, "progress", 1)
+    _add_counter(actor_id, "orange_worn", 1)
     return (True, "")
 
 def apply_finn_wear_no_cost(*, actor_id: str) -> None:
     add_status(actor_id, "orange_wear_product", 1)
     add_status(actor_id, "progress", 1)
+    _add_counter(actor_id, "orange_worn", 1)
 
 def apply_photo_progress_only(*, actor_id: str, target_id: str) -> None:
     # progress +1 for actor (tourist)
@@ -204,6 +227,54 @@ def game_end_immediately(*, params: dict, players: list[str], current_player_id=
     g["game_over_reason"] = reason
     save_current_game(g)
 
+def current_and_lowest_curiosity_plus(*, params: dict, players: list[str], current_player_id=None):
+    """
+    Effect:
+    - Find all players with lowest curiosity (ties included) -> +1
+    - Then current player +1
+    """
+    if not isinstance(players, list) or not players:
+        return
+
+    # find minimum curiosity among players
+    min_cur = None
+    for rid in players:
+        gs = load_role_gamestate(rid)
+        st = gs.get("status", {})
+        if not isinstance(st, dict):
+            st = {}
+        try:
+            cur = int(st.get("curiosity", 0))
+        except Exception:
+            cur = 0
+        if min_cur is None or cur < min_cur:
+            min_cur = cur
+
+    if min_cur is None:
+        return
+
+    # all lowest curiosity players +1
+    lowest_ids = []
+    for rid in players:
+        gs = load_role_gamestate(rid)
+        st = gs.get("status", {})
+        if not isinstance(st, dict):
+            st = {}
+        try:
+            cur = int(st.get("curiosity", 0))
+        except Exception:
+            cur = 0
+        if cur == min_cur:
+            lowest_ids.append(rid)
+            add_status(rid, "curiosity", 1)
+
+    # record lowest list before any changes for role effects
+    set_last_event_context({"lowest_curiosity_targets": lowest_ids})
+
+    # current player +1
+    if current_player_id:
+        add_status(current_player_id, "curiosity", 1)
+
 # ======================
 # Dispatcher
 # ======================
@@ -211,6 +282,7 @@ EFFECT_REGISTRY = {
     "all_role_stat_plus": all_role_stat_plus,
     "current_player_stat_plus": current_player_stat_plus,
     "game_end_immediately": game_end_immediately,
+    "current_and_lowest_curiosity_plus": current_and_lowest_curiosity_plus,
 }
 
 def run_global_effect(
@@ -286,6 +358,114 @@ def list_photo_targets(actor_id: str, players: list[str]) -> list[str]:
         if (orange_worn + orange_product) >= 1:
             targets.append(rid)
     return targets
+
+def list_lowest_curiosity_targets(*, actor_id: str, players: list[str]) -> list[str]:
+    if not isinstance(players, list):
+        return []
+
+    # prefer last_event_context (before global effect modified curiosity)
+    g = load_current_game()
+    lec = g.get("last_event_context")
+    if isinstance(lec, dict):
+        ids = lec.get("lowest_curiosity_targets")
+        if isinstance(ids, list) and ids:
+            targets = []
+            for rid in ids:
+                if not rid or rid == actor_id:
+                    continue
+                gs = load_role_gamestate(rid)
+                st = gs.get("status", {})
+                if not isinstance(st, dict):
+                    st = {}
+                try:
+                    orange_worn = int(st.get("orange_wear_product", 0))
+                except Exception:
+                    orange_worn = 0
+                if orange_worn >= 1:
+                    targets.append(rid)
+            return targets
+
+    # fallback: compute by current curiosity
+    min_cur = None
+    for rid in players:
+        if not rid or rid == actor_id:
+            continue
+        gs = load_role_gamestate(rid)
+        st = gs.get("status", {})
+        if not isinstance(st, dict):
+            st = {}
+        try:
+            cur = int(st.get("curiosity", 0))
+        except Exception:
+            cur = 0
+        if min_cur is None or cur < min_cur:
+            min_cur = cur
+    if min_cur is None:
+        return []
+
+    targets = []
+    for rid in players:
+        if not rid or rid == actor_id:
+            continue
+        gs = load_role_gamestate(rid)
+        st = gs.get("status", {})
+        if not isinstance(st, dict):
+            st = {}
+        try:
+            cur = int(st.get("curiosity", 0))
+        except Exception:
+            cur = 0
+        try:
+            orange_worn = int(st.get("orange_wear_product", 0))
+        except Exception:
+            orange_worn = 0
+        if cur == min_cur and orange_worn >= 1:
+            targets.append(rid)
+    return targets
+
+def list_lowest_curiosity_players(*, actor_id: str, players: list[str]) -> list[str]:
+    if not isinstance(players, list):
+        return []
+
+    g = load_current_game()
+    lec = g.get("last_event_context")
+    if isinstance(lec, dict):
+        ids = lec.get("lowest_curiosity_targets")
+        if isinstance(ids, list) and ids:
+            return [rid for rid in ids if rid and rid != actor_id]
+
+    min_cur = None
+    for rid in players:
+        if not rid or rid == actor_id:
+            continue
+        gs = load_role_gamestate(rid)
+        st = gs.get("status", {})
+        if not isinstance(st, dict):
+            st = {}
+        try:
+            cur = int(st.get("curiosity", 0))
+        except Exception:
+            cur = 0
+        if min_cur is None or cur < min_cur:
+            min_cur = cur
+    if min_cur is None:
+        return []
+
+    out = []
+    for rid in players:
+        if not rid or rid == actor_id:
+            continue
+        gs = load_role_gamestate(rid)
+        st = gs.get("status", {})
+        if not isinstance(st, dict):
+            st = {}
+        try:
+            cur = int(st.get("curiosity", 0))
+        except Exception:
+            cur = 0
+        if cur == min_cur:
+            out.append(rid)
+    return out
 
 def can_take_photo(actor_id: str, actor_gs: dict, target_id: str, target_gs: dict) -> bool:
     """
@@ -418,7 +598,54 @@ def wear_then_photo_start(*, actor_id: str, players: list[str], params: dict | N
         "pre_action": "wear_target",
     }
     payload = {"targets": targets}
+    return ("need_wear_target", payload, pending)
+
+def tourist_photo_lowest_curiosity_start(*, actor_id: str, players: list[str], params: dict | None = None):
+    """
+    Step 1: choose among lowest-curiosity players (ties included) who are wearing orange.
+    Then proceed to consent (forced agree).
+    """
+    params = params if isinstance(params, dict) else {}
+    targets = list_lowest_curiosity_targets(actor_id=actor_id, players=players)
+    if not targets:
+        return ("fail", {"reason": "no_targets"}, None)
+    pending = {
+        "type": "try_take_photo",
+        "stage": "choose_target",
+        "actor_id": actor_id,
+        "targets": targets,
+        "target_id": None,
+        "params": params,
+        "force_agree": True,
+    }
+    payload = {"targets": targets}
     return ("need_target", payload, pending)
+
+def vendor_trade_lowest_curiosity_start(*, actor_id: str, players: list[str], params: dict | None = None):
+    """
+    Step 1: choose item, then choose partner among lowest-curiosity players.
+    Partner consent is forced.
+    """
+    params = params if isinstance(params, dict) else {}
+    targets = list_lowest_curiosity_players(actor_id=actor_id, players=players)
+    if not targets:
+        return ("fail", {"reason": "no_targets"}, None)
+
+    items = list_trade_items(actor_id=actor_id, load_gs_fn=load_role_gamestate)
+    if not items:
+        return ("fail", {"reason": "no_trade_items"}, None)
+
+    pending = {
+        "type": "try_trade",
+        "stage": "choose_item",
+        "actor_id": actor_id,
+        "item": None,
+        "partner_id": None,
+        "params": params,
+        "partner_filter": targets,
+        "force_agree": True,
+    }
+    return ("need_item", {"items": items}, pending)
 
 
 def try_take_photo_choose_target(*, pending: dict, target_id: str):
@@ -488,6 +715,10 @@ def try_take_photo_consent(
 
     # Finn cannot refuse photo
     if target_id == "role_finn":
+        agree = True
+
+    # force agree if configured
+    if pending.get("force_agree"):
         agree = True
 
     if not agree:
@@ -601,6 +832,9 @@ def try_trade_choose_item(*, pending: dict, item_index: int, players: list[str])
         players=players or [],
         load_gs_fn=load_role_gamestate,
     )
+    partner_filter = pending.get("partner_filter")
+    if isinstance(partner_filter, list):
+        partners = [rid for rid in partners if rid in partner_filter]
     if not partners:
         return ("fail", {"reason": "no_partners"}, None)
 
@@ -652,13 +886,21 @@ def try_trade_choose_partner(*, pending: dict, partner_id: str, players: list[st
         return ("fail", {"reason": "missing_actor"}, None)
 
     # partner 必须是本局玩家之一且不能是自己
-    if not isinstance(players, list) or partner_id not in players or partner_id == actor_id:
+    partner_filter = pending.get("partner_filter")
+    if (
+        not isinstance(players, list)
+        or partner_id not in players
+        or partner_id == actor_id
+        or (isinstance(partner_filter, list) and partner_id not in partner_filter)
+    ):
         # 仍然停留在选对象阶段
         partners = list_trade_partners(
             actor_id=actor_id,
             players=players or [],
             load_gs_fn=load_role_gamestate,
         )
+        if isinstance(partner_filter, list):
+            partners = [rid for rid in partners if rid in partner_filter]
         return ("need_partner", {"partners": partners, "error": "invalid_partner"}, pending)
 
     # ✅ 记住对象
@@ -835,6 +1077,9 @@ def try_trade_consent(
             return ("fail", {"reason": "missing_data"}, None)
 
     # ❌ 对方拒绝
+    if pending.get("force_agree"):
+        agree = True
+
     if not agree:
         return ("done", {"ok": False, "reason": "rejected"}, None)
 
@@ -1101,3 +1346,20 @@ def rc_finn_wear_orange_no_cost(*, actor_id: str, params: dict, players=None):
 def rc_tourist_wear_then_photo(*, actor_id: str, params: dict, players=None):
     players = players if isinstance(players, list) else []
     return wear_then_photo_start(actor_id=actor_id, players=players, params=params)
+
+@register_rolecard_effect("finn_bonus_orange_if_wearing")
+def rc_finn_bonus_orange_if_wearing(*, actor_id: str, params: dict, players=None):
+    gs = load_role_gamestate(actor_id)
+    if _get_status_int(gs, "orange_wear_product") >= 1:
+        add_status(actor_id, "orange_product", 1)
+    return ("done", {"ok": True, "effect": "finn_bonus_orange_if_wearing"}, None)
+
+@register_rolecard_effect("tourist_photo_lowest_curiosity")
+def rc_tourist_photo_lowest_curiosity(*, actor_id: str, params: dict, players=None):
+    players = players if isinstance(players, list) else []
+    return tourist_photo_lowest_curiosity_start(actor_id=actor_id, players=players, params=params)
+
+@register_rolecard_effect("vendor_trade_lowest_curiosity")
+def rc_vendor_trade_lowest_curiosity(*, actor_id: str, params: dict, players=None):
+    players = players if isinstance(players, list) else []
+    return vendor_trade_lowest_curiosity_start(actor_id=actor_id, players=players, params=params)

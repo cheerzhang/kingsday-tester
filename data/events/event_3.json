@@ -1,12 +1,12 @@
 {
-  "id": "event_orange_crown",
+  "id": "event_orange_scaf",
   "name": "橙色围巾",
   "global_effect": {
     "id": "current_player_stat_plus",
     "label": "当前玩家获得 1 件橙色物品",
     "params": {
       "amount": 1,
-      "stat": "curiosity"
+      "stat": "orange_product"
     }
   },
 

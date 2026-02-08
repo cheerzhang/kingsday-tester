@@ -51,6 +51,11 @@
       "param_defaults": {}
     },
     {
+      "id": "current_and_lowest_curiosity_plus",
+      "label_template": "抽卡者与好奇心最低的玩家好奇心 +1",
+      "param_defaults": {}
+    },
+    {
       "id": "trade_price_multiplier",
       "label_template": "所有玩家交易价格 x{factor}",
       "param_defaults": {

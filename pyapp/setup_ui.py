@@ -323,6 +323,8 @@ class SetupTab(ttk.Frame):
         # 2.2 互动流程：拍照
         elif ui_mode == "PHOTO_NEED_TARGET":
             self.show_photo_targets(info.get("targets", []))
+        elif ui_mode == "WEAR_NEED_TARGET":
+            self.show_wear_targets(info.get("targets", []))
 
         elif ui_mode == "PHOTO_NEED_CONSENT":
             self.show_photo_consent(info.get("target_id", ""))
@@ -535,6 +537,31 @@ class SetupTab(ttk.Frame):
 
         # 允许跳过（这里用“不使用”按钮更统一）
         self.btn_role_skip.configure(text="跳过拍照")
+        self.btn_role_skip.pack(side="left", padx=6)
+
+    def show_wear_targets(self, targets: list[str]):
+        self.clear_action_buttons()
+
+        if not isinstance(targets, list):
+            targets = []
+
+        # 动态按钮列表（方便 destroy）
+        self.cost_buttons = []
+
+        for rid in targets:
+            try:
+                name = self.get_role_name(rid)
+            except Exception:
+                name = rid
+            btn = ttk.Button(
+                self.action_bar,
+                text=f"给 {name} 穿上",
+                command=lambda x=rid: self.on_photo_target(x)
+            )
+            btn.pack(side="left", padx=6)
+            self.cost_buttons.append(btn)
+
+        self.btn_role_skip.configure(text="跳过")
         self.btn_role_skip.pack(side="left", padx=6)
 
 
