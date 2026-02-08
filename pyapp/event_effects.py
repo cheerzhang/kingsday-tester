@@ -422,6 +422,10 @@ def try_take_photo_consent(
     if not can_take_photo(actor_id, actor_gs, target_id, target_gs):
         return ("done", {"ok": False, "reason": "gate_failed"}, None)
 
+    # Finn cannot refuse photo
+    if target_id == "role_finn":
+        agree = True
+
     if not agree:
         return ("done", {"ok": False, "reason": "rejected"}, None)
 
