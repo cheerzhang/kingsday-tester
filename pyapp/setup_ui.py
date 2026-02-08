@@ -64,6 +64,7 @@ class SetupTab(ttk.Frame):
         self.card_id_var = tk.StringVar(value="None")
         self.card_name_var = tk.StringVar(value="None")
         self.card_label_var = tk.StringVar(value="None")
+        self.role_effect_label_var = tk.StringVar(value="None")
 
         ttk.Label(card_box, text="Card ID:", font=("Arial", 11, "bold")).pack(anchor="w")
         ttk.Label(card_box, textvariable=self.card_id_var).pack(anchor="w", pady=(0, 8))
@@ -71,6 +72,8 @@ class SetupTab(ttk.Frame):
         ttk.Label(card_box, textvariable=self.card_name_var).pack(anchor="w", pady=(0, 8))
         ttk.Label(card_box, text="Global Effect:", font=("Arial", 11, "bold")).pack(anchor="w")
         ttk.Label(card_box, textvariable=self.card_label_var, wraplength=260).pack(anchor="w")
+        ttk.Label(card_box, text="Role Effect:", font=("Arial", 11, "bold")).pack(anchor="w", pady=(8, 0))
+        ttk.Label(card_box, textvariable=self.role_effect_label_var, wraplength=260).pack(anchor="w")
 
         # ----- current turn panel -----
         turn_box = ttk.LabelFrame(self, text="Current Player", padding=10)
@@ -242,6 +245,7 @@ class SetupTab(ttk.Frame):
         self.card_id_var.set("None")
         self.card_name_var.set("None")
         self.card_label_var.set("None")
+        self.role_effect_label_var.set("None")
         try:
             self.log_text.delete("1.0", "end")
         except Exception:
@@ -295,10 +299,12 @@ class SetupTab(ttk.Frame):
             self.card_name_var.set(ce.get("name") or "None")
             lab = ce.get("global_label") or "None"
             self.card_label_var.set(lab)
+            self.role_effect_label_var.set(ce.get("role_label") or "None")
         else:
             self.card_id_var.set("None")
             self.card_name_var.set("None")
             self.card_label_var.set("None")
+            self.role_effect_label_var.set("None")
         # =========================================================
         # 2) 显示按钮（这里就是你要找的“显示按钮的那部分”）
         #    - 互动流程（拍照/交易）优先显示对应按钮

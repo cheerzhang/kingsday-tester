@@ -376,10 +376,17 @@ class GameFlow:
         label = ""
         if isinstance(ge, dict):
             label = str(ge.get("label", "")).strip()
+        role_label = ""
+        role_effects = ev.get("role_effects", {})
+        if isinstance(role_effects, dict):
+            reff = role_effects.get(current_player_id)
+            if isinstance(reff, dict):
+                role_label = str(reff.get("label", "")).strip()
         self.current_event_info = {
             "id": str(ev.get("id", "")).strip(),
             "name": str(ev.get("name", "")).strip(),
             "global_label": label,
+            "role_label": role_label,
         }
         run_global_effect(
             effect_id,

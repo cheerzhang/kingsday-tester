@@ -13,17 +13,20 @@
     "role_finn": {
       "type": "simple_effect",
       "id": "finn_wear_orange_plus_curiosity",
-      "params": {}
+      "params": {},
+      "label": "穿上橙色物品并好奇心 +1"
     },
     "role_tourist": {
       "type": "simple_effect",
       "id": "tourist_gift_finn_wear_and_photo",
-      "params": {}
+      "params": {},
+      "label": "给 Finn 穿上橙色物品并立刻完成拍照"
     },
     "role_vendor": {
       "type": "simple_effect",
       "id": "vendor_orange_price_plus_2",
-      "params": {}
+      "params": {},
+      "label": "摊主橙色物品售价 +2"
     }
   }
 }

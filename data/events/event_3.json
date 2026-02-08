@@ -14,12 +14,14 @@
     "role_finn": {
       "type": "simple_effect",
       "id": "finn_wear_orange_no_cost",
-      "params": {}
+      "params": {},
+      "label": "立刻穿上一件橙色物品(没有门槛代价)"
     },
     "role_tourist": {
       "type": "interactive_action",
       "id": "tourist_wear_then_photo",
-      "params": {}
+      "params": {},
+      "label": "给任意玩家穿上并对其发起拍照"
     },
     "role_vendor": null
   }

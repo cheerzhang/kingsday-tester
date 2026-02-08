@@ -17,17 +17,20 @@
       "params": {
         "stat": "orange_product",
         "amount": 1
-      }
+      },
+      "label": "获得 1 件橙色物品"
     },
     "role_tourist": {
       "type": "interactive_action",
       "id": "try_take_photo",
-      "params": { "photo": 1 }
+      "params": { "photo": 1 },
+      "label": "发起一次拍照"
     },
     "role_vendor": {
       "type": "simple_effect",
       "id": "vendor_price_double_all",
-      "params": {}
+      "params": {},
+      "label": "所有游戏中的商品交易价格 x2"
     }
   }
 }
