@@ -1,0 +1,38 @@
+{
+  "id": "event_temp_stall",
+  "name": "临时小摊",
+  "global_effect": {
+    "id": "current_player_stat_plus",
+    "label": "当前玩家获得 1 件普通物品",
+    "params": {
+      "stat": "product",
+      "amount": 1
+    }
+  },
+  "role_effects": {
+    "role_finn": {
+      "type": "interactive_action",
+      "id": "finn_exchange_product_for_orange",
+      "params": {},
+      "label": "选择一名玩家，用普通物品换 1 件橙色物品（对方不可拒绝）"
+    },
+    "role_tourist": {
+      "type": "simple_effect",
+      "id": "tourist_product_for_curiosity",
+      "params": {},
+      "label": "消耗 1 件普通物品，好奇心 +1"
+    },
+    "role_vendor": {
+      "type": "interactive_action",
+      "id": "vendor_trade_product_force",
+      "params": {},
+      "label": "发起一次普通物品交易（不可拒绝）"
+    },
+    "role_food_vendor": {
+      "type": "simple_effect",
+      "id": "food_vendor_product_for_stamina",
+      "params": {},
+      "label": "消耗 1 件普通物品，体力 +1"
+    }
+  }
+}

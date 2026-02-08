@@ -56,6 +56,30 @@ def can_pay_cost(status: dict, resource: str, delta: int) -> bool:
         return False
     return (cur + d) >= 0
 
+def _normalize_cost_option(opt: dict) -> dict | None:
+    if not isinstance(opt, dict):
+        return None
+    # multi-cost option
+    if isinstance(opt.get("costs"), list):
+        costs = []
+        for c in opt.get("costs"):
+            if not isinstance(c, dict):
+                continue
+            res = c.get("resource")
+            delta = c.get("delta")
+            if not res:
+                continue
+            costs.append({"resource": str(res), "delta": int(delta)})
+        if not costs:
+            return None
+        return {"costs": costs}
+    # single-cost option
+    res = opt.get("resource")
+    delta = opt.get("delta")
+    if not res:
+        return None
+    return {"costs": [{"resource": str(res), "delta": int(delta)}]}
+
 def check_draw_card_eligibility(role_obj: dict, gamestate_obj: dict) -> tuple[bool, list[dict]]:
     """
     Returns:
@@ -78,14 +102,12 @@ def check_draw_card_eligibility(role_obj: dict, gamestate_obj: dict) -> tuple[bo
 
     payable = []
     for opt in options:
-        if not isinstance(opt, dict):
+        norm = _normalize_cost_option(opt)
+        if not norm:
             continue
-        res = opt.get("resource")
-        delta = opt.get("delta")
-        if not res:
-            continue
-        if can_pay_cost(status, str(res), int(delta)):
-            payable.append({"resource": str(res), "delta": int(delta)})
+        costs = norm.get("costs", [])
+        if all(can_pay_cost(status, c["resource"], c["delta"]) for c in costs):
+            payable.append(norm)
 
     return (len(payable) > 0, payable)
 
@@ -111,17 +133,32 @@ def apply_cost_option(role_id: str, option: dict) -> dict:
         st = {}
         gs["status"] = st
 
-    res = str(option.get("resource", "")).strip()
-    delta = int(option.get("delta", 0))
-
-    try:
-        cur = int(st.get(res, 0))
-    except Exception:
-        cur = 0
-
-    st[res] = cur + delta
-    if st[res] < 0:
-        st[res] = 0  # 防负数（你说先不做严格校验，这里简单保护）
+    costs = option.get("costs")
+    if isinstance(costs, list) and costs:
+        for c in costs:
+            if not isinstance(c, dict):
+                continue
+            res = str(c.get("resource", "")).strip()
+            delta = int(c.get("delta", 0))
+            if not res:
+                continue
+            try:
+                cur = int(st.get(res, 0))
+            except Exception:
+                cur = 0
+            st[res] = cur + delta
+            if st[res] < 0:
+                st[res] = 0
+    else:
+        res = str(option.get("resource", "")).strip()
+        delta = int(option.get("delta", 0))
+        try:
+            cur = int(st.get(res, 0))
+        except Exception:
+            cur = 0
+        st[res] = cur + delta
+        if st[res] < 0:
+            st[res] = 0  # 防负数（你说先不做严格校验，这里简单保护）
 
     save_gamestate(role_id, gs)
     return gs
@@ -139,11 +176,9 @@ def get_draw_cost_config(role_obj: dict) -> tuple[str, list[dict]]:
     # normalize
     out = []
     for o in opts:
-        if not isinstance(o, dict):
-            continue
-        if "resource" not in o or "delta" not in o:
-            continue
-        out.append({"resource": str(o["resource"]), "delta": int(o["delta"])})
+        norm = _normalize_cost_option(o)
+        if norm:
+            out.append(norm)
     return (logic, out)
 
 # ==========================================================

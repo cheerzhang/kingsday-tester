@@ -72,11 +72,14 @@ class GameFlow:
         self.turn_index: int = 0
         self.logs: list[str] = []
         self.current_event_info = None
+        self.pending_help = None
 
         # OR draw: waiting for player choice
         self.pending_cost_choice = None
         self.pending_action = None
         self.pending_role_effect = None
+        self.pending_event_target = None
+        self.pending_watchers = None
         # event display defs (label_template etc.)
         self.event_defs = load_event_effect_defs()
 
@@ -159,12 +162,15 @@ class GameFlow:
         gs = load_player_gamestate(rid)
 
         can_draw, _ = check_draw_card_eligibility(role, gs)
+        skill = role.get("active_skill")
+        has_skill = isinstance(skill, dict) and str(skill.get("id", "")).strip()
 
         return {
             "role_id": rid,
             "role_name": role.get("name", rid),
             "can_draw": can_draw,
-            "can_use_skill": True,   # stub for now
+            "can_use_skill": bool(has_skill),
+            "has_skill": bool(has_skill),
             "can_skip": True,
         }
 
@@ -200,9 +206,18 @@ class GameFlow:
         # THEN logic: auto choose first payable in order
         if logic == "THEN":
             chosen = None
+            def _costs_equal(a: dict, b: dict) -> bool:
+                ca = a.get("costs") or []
+                cb = b.get("costs") or []
+                if len(ca) != len(cb):
+                    return False
+                sa = sorted((c.get("resource"), int(c.get("delta", 0))) for c in ca)
+                sb = sorted((c.get("resource"), int(c.get("delta", 0))) for c in cb)
+                return sa == sb
+
             for opt in options:
                 for p in payable:
-                    if p["resource"] == opt["resource"] and p["delta"] == opt["delta"]:
+                    if _costs_equal(p, opt):
                         chosen = opt
                         break
                 if chosen:
@@ -212,7 +227,13 @@ class GameFlow:
                 chosen = payable[0]
 
             apply_cost_option(rid, chosen)
-            self.logs.append(f"[DRAW] Paid (THEN): {chosen['resource']}{chosen['delta']}")
+            # display cost summary
+            costs = chosen.get("costs", [])
+            if costs:
+                parts = [f"{c.get('resource')}{int(c.get('delta', 0))}" for c in costs]
+                self.logs.append("[DRAW] Paid (THEN): " + ", ".join(parts))
+            else:
+                self.logs.append(f"[DRAW] Paid (THEN): {chosen['resource']}{chosen['delta']}")
 
             return ("next_turn", self.draw_card(rid))
 
@@ -243,7 +264,12 @@ class GameFlow:
 
         chosen = choices[index]
         apply_cost_option(rid, chosen)
-        self.logs.append(f"[DRAW] Paid (OR): {chosen['resource']}{chosen['delta']}")
+        costs = chosen.get("costs", [])
+        if costs:
+            parts = [f"{c.get('resource')}{int(c.get('delta', 0))}" for c in costs]
+            self.logs.append("[DRAW] Paid (OR): " + ", ".join(parts))
+        else:
+            self.logs.append(f"[DRAW] Paid (OR): {chosen['resource']}{chosen['delta']}")
 
         self.pending_cost_choice = None
         return ("next_turn", self.draw_card(rid))
@@ -294,7 +320,25 @@ class GameFlow:
         ):
             ok, reason = apply_finn_wear_costs_and_progress(rid)
             if not ok:
-                self.logs.append(reason)
+                if "role_volunteer" in self.players and reason != "need_orange_product":
+                    self.pending_help = {
+                        "action_type": "finn_wear",
+                        "actor_id": rid,
+                        "extra_curiosity": False,
+                        "reason": reason,
+                    }
+                    return {
+                        "role_id": rid,
+                        "role_name": load_role_by_id(rid).get("name", rid),
+                        "ui_mode": "HELP_DECISION",
+                        "help_action": "finn_wear",
+                    }
+                msg = {
+                    "need_curiosity": "[SKILL] Finn wear requires enough curiosity.",
+                    "need_orange_product": "[SKILL] Finn wear requires orange_product >= 1.",
+                    "need_stamina": "[SKILL] Finn wear requires stamina >= 1.",
+                }.get(reason, str(reason))
+                self.logs.append(msg)
                 return self.end_turn()
             self.logs.append("[SKILL] Finn wear success: stamina -1, orange_product -1, orange_wear_product +1")
 
@@ -359,6 +403,109 @@ class GameFlow:
                             "partner_id": payload.get("partner_id", ""),
                         }
 
+            if kind == "need_perform_decision":
+                self.pending_interactive = pending
+                return {
+                    "role_id": rid,
+                    "role_name": role.get("name", rid),
+                    "ui_mode": "PERFORM_WATCH_DECIDE",
+                    "target_id": payload.get("target_id", ""),
+                }
+
+            if kind == "need_perform_benefit":
+                self.pending_interactive = pending
+                return {
+                    "role_id": rid,
+                    "role_name": role.get("name", rid),
+                    "ui_mode": "PERFORM_WATCH_BENEFIT",
+                    "target_id": payload.get("target_id", ""),
+                }
+
+            if kind == "need_gift_target":
+                self.pending_interactive = pending
+                return {
+                    "role_id": rid,
+                    "role_name": role.get("name", rid),
+                    "ui_mode": "GIFT_NEED_TARGET",
+                    "targets": payload.get("targets", []),
+                }
+            if kind == "need_exchange_target":
+                self.pending_interactive = pending
+                return {
+                    "role_id": rid,
+                    "role_name": role.get("name", rid),
+                    "ui_mode": "EXCHANGE_NEED_TARGET",
+                    "targets": payload.get("targets", []),
+                }
+            if kind == "need_exchange_choice":
+                self.pending_interactive = pending
+                return {
+                    "role_id": rid,
+                    "role_name": role.get("name", rid),
+                    "ui_mode": "EXCHANGE_NEED_CHOICE",
+                    "options": payload.get("options", []),
+                }
+
+            if kind == "need_food_decision":
+                self.pending_interactive = pending
+                return {
+                    "role_id": rid,
+                    "role_name": role.get("name", rid),
+                    "ui_mode": "FOOD_OFFER_DECIDE",
+                    "target_id": payload.get("target_id", ""),
+                    "price": payload.get("price", 0),
+                }
+            if kind == "need_food_force":
+                self.pending_interactive = pending
+                return {
+                    "role_id": rid,
+                    "role_name": role.get("name", rid),
+                    "ui_mode": "FOOD_OFFER_FORCE",
+                    "target_id": payload.get("target_id", ""),
+                    "price": payload.get("price", 0),
+                }
+
+            if kind == "need_help":
+                if "role_volunteer" not in self.players:
+                    if payload.get("action_type") in ("perform_start", "perform_watch"):
+                        from event_effects import perform_show_help
+                        pending = payload.get("pending")
+                        target_id = payload.get("target_id")
+                        choice = payload.get("choice")
+                        kind2, pl, new_pending = perform_show_help(
+                            pending=pending,
+                            target_id=target_id,
+                            choice=choice,
+                            helped=False,
+                        )
+                        if kind2 == "need_perform_decision":
+                            self.pending_interactive = new_pending
+                            if isinstance(pl, dict):
+                                for line in pl.get("logs", []):
+                                    self.logs.append(line)
+                            return {
+                                "role_id": rid,
+                                "role_name": role.get("name", rid),
+                                "ui_mode": "PERFORM_WATCH_DECIDE",
+                                "target_id": pl.get("target_id", ""),
+                            }
+                        if isinstance(pl, dict):
+                            for line in pl.get("logs", []):
+                                self.logs.append(line)
+                        return self.end_turn()
+                    self.logs.append("[HELP] No volunteer in game.")
+                    return self.end_turn()
+                if payload.get("action_type") == "finn_wear" and payload.get("reason") == "need_orange_product":
+                    self.logs.append("[HELP] Finn has no orange_product; cannot help.")
+                    return self.end_turn()
+                self.pending_help = payload
+                return {
+                    "role_id": rid,
+                    "role_name": role.get("name", rid),
+                    "ui_mode": "HELP_DECISION",
+                    "help_action": payload.get("action_type", ""),
+                }
+
             # 非互动 done/fail：走正常结束回合
             self.logs.append(f"[SKILL] {kind}: {payload}")
 
@@ -398,6 +545,42 @@ class GameFlow:
             "global_label": label,
             "role_label": role_label,
         }
+        # special: global effect needs a chosen target
+        if effect_id in ("choose_event_target", "choose_event_target_only", "choose_event_target_plus_stamina2", "choose_event_target_plus_curiosity_minus_stamina"):
+            targets = [rid for rid in self.players if rid and rid != current_player_id]
+            if not targets:
+                self.logs.append("[EVENT] No valid target for event.")
+            else:
+                self.pending_event_target = {
+                    "actor_id": current_player_id,
+                    "event": ev,
+                    "params": params,
+                }
+                return {
+                    "role_id": current_player_id,
+                    "role_name": load_role_by_id(current_player_id).get("name", current_player_id),
+                    "ui_mode": "EVENT_NEED_TARGET",
+                    "targets": targets,
+                }
+        if effect_id == "choose_watchers":
+            targets = [rid for rid in self.players if rid]
+            if not targets:
+                self.logs.append("[EVENT] No valid watchers.")
+            else:
+                self.pending_watchers = {
+                    "actor_id": current_player_id,
+                    "event": ev,
+                    "remaining": list(targets),
+                    "watchers": [],
+                }
+                first_id = targets[0]
+                return {
+                    "role_id": current_player_id,
+                    "role_name": load_role_by_id(current_player_id).get("name", current_player_id),
+                    "ui_mode": "WATCH_DECIDE",
+                    "target_id": first_id,
+                }
+
         run_global_effect(
             effect_id,
             params,
@@ -414,26 +597,26 @@ class GameFlow:
         # =======================================================
         # ✅【新增】抽卡 + 全局效果之后：给当前玩家“可选”个人效果
         # =======================================================
+        return self._post_event_role_effect(current_player_id, ev)
+        # =======================================================
+        return self.end_turn()
+
+    def _post_event_role_effect(self, current_player_id: str, ev: dict):
         role_effects = ev.get("role_effects", {})
         if isinstance(role_effects, dict):
             reff = role_effects.get(current_player_id)
         else:
             reff = None
-        # 有个人效果：暂停回合，交给 UI 显示“触发/跳过”
         if isinstance(reff, dict):
             gs = load_player_gamestate(current_player_id)
             st = gs.get("status", {})
             stamina = int(st.get("stamina", 0)) if isinstance(st, dict) else 0
             can_trigger = stamina >= 1
-
-            # 保存 pending，供 trigger/skip 按钮调用
             self.pending_role_effect = {
                 "actor_id": current_player_id,
                 "role_effect": reff,
             }
-
             self.logs.append("[ROLE_EFFECT] Trigger (-1 stamina) or skip?")
-
             role = load_role_by_id(current_player_id)
             return {
                 "role_id": current_player_id,
@@ -443,8 +626,72 @@ class GameFlow:
                 "role_effect_type": str(reff.get("type", "")).strip(),
                 "role_effect_id": str(reff.get("id", "")).strip(),
             }
-        # =======================================================
         return self.end_turn()
+
+    def event_choose_target(self, target_id: str):
+        pending = self.pending_event_target
+        self.pending_event_target = None
+        if not isinstance(pending, dict):
+            self.logs.append("[EVENT] No pending event target.")
+            return self.end_turn()
+        actor_id = pending.get("actor_id", "")
+        ev = pending.get("event", {})
+        if not actor_id or not isinstance(ev, dict):
+            self.logs.append("[EVENT] Invalid pending event.")
+            return self.end_turn()
+        if not target_id or target_id == actor_id:
+            self.logs.append("[EVENT] Invalid target.")
+            return self.end_turn()
+        # apply target curiosity +1 if configured, and store context
+        from event_effects import add_status, set_last_event_context
+        ge = ev.get("global_effect", {}) if isinstance(ev, dict) else {}
+        effect_id = str(ge.get("id", "")).strip()
+        if effect_id == "choose_event_target":
+            add_status(target_id, "curiosity", 1)
+        if effect_id == "choose_event_target_plus_stamina2":
+            add_status(target_id, "stamina", 2)
+        if effect_id == "choose_event_target_plus_curiosity_minus_stamina":
+            add_status(target_id, "curiosity", 1)
+            from event_effects import _get_status_int
+            tgs = load_player_gamestate(target_id)
+            if _get_status_int(tgs, "stamina") > 0:
+                add_status(target_id, "stamina", -1)
+        set_last_event_context({"selected_target": target_id})
+        # continue to role effect choice
+        return self._post_event_role_effect(actor_id, ev)
+
+    def watch_decide(self, target_id: str, watch: bool):
+        pending = self.pending_watchers
+        if not isinstance(pending, dict):
+            self.logs.append("[EVENT] No pending watcher list.")
+            return self.end_turn()
+        remaining = pending.get("remaining", [])
+        if not isinstance(remaining, list) or not remaining:
+            self.pending_watchers = None
+            return self.end_turn()
+        current = remaining.pop(0)
+        if current != target_id:
+            self.logs.append("[EVENT] Invalid watcher target.")
+            return self.end_turn()
+        if watch:
+            pending.setdefault("watchers", []).append(target_id)
+            from event_effects import add_status
+            add_status(target_id, "curiosity", 1)
+        if not remaining:
+            from event_effects import set_last_event_context
+            set_last_event_context({"watchers": pending.get("watchers", [])})
+            self.pending_watchers = None
+            actor_id = pending.get("actor_id", "")
+            ev = pending.get("event", {})
+            return self._post_event_role_effect(actor_id, ev)
+        next_id = remaining[0]
+        self.pending_watchers = pending
+        return {
+            "role_id": pending.get("actor_id", ""),
+            "role_name": load_role_by_id(pending.get("actor_id", "")).get("name", pending.get("actor_id", "")),
+            "ui_mode": "WATCH_DECIDE",
+            "target_id": next_id,
+        }
 
     def draw_random_event_and_log(self, current_player_id: str):
         # 1) load deck state from current_game.json
@@ -670,6 +917,68 @@ class GameFlow:
                     "ui_mode": "WEAR_NEED_TARGET",
                     "targets": payload.get("targets", []),
                 }
+            # ---- need_food_decision: UI 显示供餐决策 ----
+            if kind == "need_food_decision":
+                self.pending_interactive = pending
+                return {
+                    "role_id": actor_id,
+                    "role_name": load_role_by_id(actor_id).get("name", actor_id),
+                    "ui_mode": "FOOD_OFFER_DECIDE",
+                    "target_id": payload.get("target_id", ""),
+                    "price": payload.get("price", 0),
+                }
+            if kind == "need_food_force":
+                self.pending_interactive = pending
+                return {
+                    "role_id": actor_id,
+                    "role_name": load_role_by_id(actor_id).get("name", actor_id),
+                    "ui_mode": "FOOD_OFFER_FORCE",
+                    "target_id": payload.get("target_id", ""),
+                    "price": payload.get("price", 0),
+                }
+            # ---- need_perform_decision: UI 显示围观选择 ----
+            if kind == "need_perform_decision":
+                self.pending_interactive = pending
+                return {
+                    "role_id": actor_id,
+                    "role_name": load_role_by_id(actor_id).get("name", actor_id),
+                    "ui_mode": "PERFORM_WATCH_DECIDE",
+                    "target_id": payload.get("target_id", ""),
+                }
+            # ---- need_perform_benefit: UI 显示围观收益选择 ----
+            if kind == "need_perform_benefit":
+                self.pending_interactive = pending
+                return {
+                    "role_id": actor_id,
+                    "role_name": load_role_by_id(actor_id).get("name", actor_id),
+                    "ui_mode": "PERFORM_WATCH_BENEFIT",
+                    "target_id": payload.get("target_id", ""),
+                }
+            # ---- need_gift_target: UI 显示赠送对象 ----
+            if kind == "need_gift_target":
+                self.pending_interactive = pending
+                return {
+                    "role_id": actor_id,
+                    "role_name": load_role_by_id(actor_id).get("name", actor_id),
+                    "ui_mode": "GIFT_NEED_TARGET",
+                    "targets": payload.get("targets", []),
+                }
+            if kind == "need_exchange_target":
+                self.pending_interactive = pending
+                return {
+                    "role_id": actor_id,
+                    "role_name": load_role_by_id(actor_id).get("name", actor_id),
+                    "ui_mode": "EXCHANGE_NEED_TARGET",
+                    "targets": payload.get("targets", []),
+                }
+            if kind == "need_exchange_choice":
+                self.pending_interactive = pending
+                return {
+                    "role_id": actor_id,
+                    "role_name": load_role_by_id(actor_id).get("name", actor_id),
+                    "ui_mode": "EXCHANGE_NEED_CHOICE",
+                    "options": payload.get("options", []),
+                }
 
             # ---- need_consent: UI 显示同意/拒绝 ----
             if kind == "need_consent" and pending.get("type") == "try_take_photo":
@@ -717,6 +1026,46 @@ class GameFlow:
                 self.pending_interactive = None
                 self.logs.append(f"[ROLE_EFFECT] {kind}: {payload}")
                 return self.end_turn()
+            if kind == "need_help":
+                if "role_volunteer" not in self.players:
+                    if payload.get("action_type") in ("perform_start", "perform_watch"):
+                        from event_effects import perform_show_help
+                        pending = payload.get("pending")
+                        target_id = payload.get("target_id")
+                        choice = payload.get("choice")
+                        kind2, pl, new_pending = perform_show_help(
+                            pending=pending,
+                            target_id=target_id,
+                            choice=choice,
+                            helped=False,
+                        )
+                        if kind2 == "need_perform_decision":
+                            self.pending_interactive = new_pending
+                            if isinstance(pl, dict):
+                                for line in pl.get("logs", []):
+                                    self.logs.append(line)
+                            return {
+                                "role_id": actor_id,
+                                "role_name": load_role_by_id(actor_id).get("name", actor_id),
+                                "ui_mode": "PERFORM_WATCH_DECIDE",
+                                "target_id": pl.get("target_id", ""),
+                            }
+                        if isinstance(pl, dict):
+                            for line in pl.get("logs", []):
+                                self.logs.append(line)
+                        return self.end_turn()
+                    self.logs.append("[HELP] No volunteer in game.")
+                    return self.end_turn()
+                if payload.get("action_type") == "finn_wear" and payload.get("reason") == "need_orange_product":
+                    self.logs.append("[HELP] Finn has no orange_product; cannot help.")
+                    return self.end_turn()
+                self.pending_help = payload
+                return {
+                    "role_id": actor_id,
+                    "role_name": load_role_by_id(actor_id).get("name", actor_id),
+                    "ui_mode": "HELP_DECISION",
+                    "help_action": payload.get("action_type", ""),
+                }
 
         # 4️⃣ 非互动：默认当作执行完成，结束回合
         self.pending_interactive = None
@@ -770,6 +1119,20 @@ class GameFlow:
             load_gs_fn=load_player_gamestate,
             save_gs_fn=save_gamestate,  # 你需要有这个函数（下面说明）
         )
+        if kind == "need_help":
+            if "role_volunteer" not in self.players:
+                self.logs.append("[HELP] No volunteer in game.")
+                return self.end_turn()
+            if payload.get("action_type") == "finn_wear" and payload.get("reason") == "need_orange_product":
+                self.logs.append("[HELP] Finn has no orange_product; cannot help.")
+                return self.end_turn()
+            self.pending_help = payload
+            return {
+                "role_id": pending.get("actor_id", ""),
+                "role_name": load_role_by_id(pending.get("actor_id", "")).get("name", pending.get("actor_id", "")),
+                "ui_mode": "HELP_DECISION",
+                "help_action": payload.get("action_type", ""),
+            }
         self.logs.append(f"[PHOTO] {kind}: {payload}")
         return self.end_turn()
     
@@ -867,5 +1230,483 @@ class GameFlow:
             load_gs_fn=load_player_gamestate,
             save_gs_fn=save_gamestate,
         )
+        if kind == "need_help":
+            if "role_volunteer" not in self.players:
+                self.logs.append("[HELP] No volunteer in game.")
+                return self.end_turn()
+            if payload.get("action_type") == "finn_wear" and payload.get("reason") == "need_orange_product":
+                self.logs.append("[HELP] Finn has no orange_product; cannot help.")
+                return self.end_turn()
+            self.pending_help = payload
+            return {
+                "role_id": pending.get("actor_id", ""),
+                "role_name": load_role_by_id(pending.get("actor_id", "")).get("name", pending.get("actor_id", "")),
+                "ui_mode": "HELP_DECISION",
+                "help_action": payload.get("action_type", ""),
+            }
         self.logs.append(f"[TRADE] {kind}: {payload}")
+        return self.end_turn()
+
+    def food_offer_decide(self, target_id: str, accept: bool):
+        pending = self.pending_interactive
+        if not isinstance(pending, dict):
+            self.logs.append("[FOOD] No pending offer.")
+            return self.end_turn()
+        from event_effects import offer_food_decide
+        kind, payload, new_pending = offer_food_decide(
+            pending=pending,
+            target_id=target_id,
+            accept=accept,
+        )
+        if kind == "need_help":
+            if "role_volunteer" not in self.players:
+                # continue without help
+                from event_effects import offer_food_help
+                pending = payload.get("pending")
+                buyer_id = payload.get("buyer_id", "")
+                kind2, pl, new_pending = offer_food_help(
+                    pending=pending,
+                    buyer_id=buyer_id,
+                    helped=False,
+                )
+                if kind2 == "need_food_decision":
+                    self.pending_interactive = new_pending
+                    return {
+                        "role_id": new_pending.get("actor_id", ""),
+                        "role_name": load_role_by_id(new_pending.get("actor_id", "")).get("name", new_pending.get("actor_id", "")),
+                        "ui_mode": "FOOD_OFFER_DECIDE",
+                        "target_id": pl.get("target_id", ""),
+                        "price": pl.get("price", 0),
+                    }
+                if kind2 == "need_food_force":
+                    self.pending_interactive = new_pending
+                    return {
+                        "role_id": new_pending.get("actor_id", ""),
+                        "role_name": load_role_by_id(new_pending.get("actor_id", "")).get("name", new_pending.get("actor_id", "")),
+                        "ui_mode": "FOOD_OFFER_FORCE",
+                        "target_id": pl.get("target_id", ""),
+                        "price": pl.get("price", 0),
+                    }
+                return self.end_turn()
+            self.pending_help = payload
+            return {
+                "role_id": pending.get("actor_id", ""),
+                "role_name": load_role_by_id(pending.get("actor_id", "")).get("name", pending.get("actor_id", "")),
+                "ui_mode": "HELP_DECISION",
+                "help_action": payload.get("action_type", ""),
+            }
+        if kind == "need_food_decision":
+            self.pending_interactive = new_pending
+            for line in payload.get("logs", []) if isinstance(payload, dict) else []:
+                self.logs.append(line)
+            return {
+                "role_id": pending.get("actor_id", ""),
+                "role_name": load_role_by_id(pending.get("actor_id", "")).get("name", pending.get("actor_id", "")),
+                "ui_mode": "FOOD_OFFER_DECIDE",
+                "target_id": payload.get("target_id", ""),
+                "price": payload.get("price", 0),
+            }
+        if kind == "need_food_force":
+            self.pending_interactive = new_pending
+            for line in payload.get("logs", []) if isinstance(payload, dict) else []:
+                self.logs.append(line)
+            return {
+                "role_id": pending.get("actor_id", ""),
+                "role_name": load_role_by_id(pending.get("actor_id", "")).get("name", pending.get("actor_id", "")),
+                "ui_mode": "FOOD_OFFER_FORCE",
+                "target_id": payload.get("target_id", ""),
+                "price": payload.get("price", 0),
+            }
+        if isinstance(payload, dict):
+            for line in payload.get("logs", []):
+                self.logs.append(line)
+        self.logs.append(f"[FOOD] {kind}: {payload}")
+        return self.end_turn()
+
+    def perform_watch_decide(self, target_id: str, watch: bool):
+        pending = self.pending_interactive
+        if not isinstance(pending, dict):
+            self.logs.append("[PERFORM] No pending performance.")
+            return self.end_turn()
+        from event_effects import perform_show_decide
+        kind, payload, new_pending = perform_show_decide(
+            pending=pending,
+            target_id=target_id,
+            watch=watch,
+        )
+        if kind == "need_help":
+            if "role_volunteer" not in self.players:
+                from event_effects import perform_show_help
+                pending2 = payload.get("pending")
+                tid = payload.get("target_id")
+                choice = payload.get("choice")
+                kind2, pl, new_pending2 = perform_show_help(
+                    pending=pending2,
+                    target_id=tid,
+                    choice=choice,
+                    helped=False,
+                )
+                if kind2 == "need_perform_decision":
+                    self.pending_interactive = new_pending2
+                    for line in pl.get("logs", []) if isinstance(pl, dict) else []:
+                        self.logs.append(line)
+                    return {
+                        "role_id": new_pending2.get("actor_id", ""),
+                        "role_name": load_role_by_id(new_pending2.get("actor_id", "")).get("name", new_pending2.get("actor_id", "")),
+                        "ui_mode": "PERFORM_WATCH_DECIDE",
+                        "target_id": pl.get("target_id", ""),
+                    }
+                if isinstance(pl, dict):
+                    for line in pl.get("logs", []):
+                        self.logs.append(line)
+                return self.end_turn()
+            self.pending_help = payload
+            return {
+                "role_id": pending.get("actor_id", ""),
+                "role_name": load_role_by_id(pending.get("actor_id", "")).get("name", pending.get("actor_id", "")),
+                "ui_mode": "HELP_DECISION",
+                "help_action": payload.get("action_type", ""),
+            }
+        if kind == "need_perform_benefit":
+            self.pending_interactive = new_pending
+            return {
+                "role_id": pending.get("actor_id", ""),
+                "role_name": load_role_by_id(pending.get("actor_id", "")).get("name", pending.get("actor_id", "")),
+                "ui_mode": "PERFORM_WATCH_BENEFIT",
+                "target_id": payload.get("target_id", ""),
+            }
+        if kind == "need_perform_decision":
+            self.pending_interactive = new_pending
+            for line in payload.get("logs", []) if isinstance(payload, dict) else []:
+                self.logs.append(line)
+            return {
+                "role_id": pending.get("actor_id", ""),
+                "role_name": load_role_by_id(pending.get("actor_id", "")).get("name", pending.get("actor_id", "")),
+                "ui_mode": "PERFORM_WATCH_DECIDE",
+                "target_id": payload.get("target_id", ""),
+            }
+        if isinstance(payload, dict):
+            for line in payload.get("logs", []):
+                self.logs.append(line)
+        self.logs.append(f"[PERFORM] {kind}: {payload}")
+        return self.end_turn()
+
+    def perform_watch_benefit(self, target_id: str, choice: str):
+        pending = self.pending_interactive
+        if not isinstance(pending, dict):
+            self.logs.append("[PERFORM] No pending performance.")
+            return self.end_turn()
+        from event_effects import perform_show_benefit
+        kind, payload, new_pending = perform_show_benefit(
+            pending=pending,
+            target_id=target_id,
+            choice=choice,
+        )
+        if kind == "need_help":
+            if "role_volunteer" not in self.players:
+                from event_effects import perform_show_help
+                pending2 = payload.get("pending")
+                tid = payload.get("target_id")
+                choice2 = payload.get("choice")
+                kind2, pl, new_pending2 = perform_show_help(
+                    pending=pending2,
+                    target_id=tid,
+                    choice=choice2,
+                    helped=False,
+                )
+                if kind2 == "need_perform_decision":
+                    self.pending_interactive = new_pending2
+                    for line in pl.get("logs", []) if isinstance(pl, dict) else []:
+                        self.logs.append(line)
+                    return {
+                        "role_id": new_pending2.get("actor_id", ""),
+                        "role_name": load_role_by_id(new_pending2.get("actor_id", "")).get("name", new_pending2.get("actor_id", "")),
+                        "ui_mode": "PERFORM_WATCH_DECIDE",
+                        "target_id": pl.get("target_id", ""),
+                    }
+                if isinstance(pl, dict):
+                    for line in pl.get("logs", []):
+                        self.logs.append(line)
+                return self.end_turn()
+            self.pending_help = payload
+            return {
+                "role_id": pending.get("actor_id", ""),
+                "role_name": load_role_by_id(pending.get("actor_id", "")).get("name", pending.get("actor_id", "")),
+                "ui_mode": "HELP_DECISION",
+                "help_action": payload.get("action_type", ""),
+            }
+        if kind == "need_perform_decision":
+            self.pending_interactive = new_pending
+            for line in payload.get("logs", []) if isinstance(payload, dict) else []:
+                self.logs.append(line)
+            return {
+                "role_id": pending.get("actor_id", ""),
+                "role_name": load_role_by_id(pending.get("actor_id", "")).get("name", pending.get("actor_id", "")),
+                "ui_mode": "PERFORM_WATCH_DECIDE",
+                "target_id": payload.get("target_id", ""),
+            }
+        if isinstance(payload, dict):
+            for line in payload.get("logs", []):
+                self.logs.append(line)
+        self.logs.append(f"[PERFORM] {kind}: {payload}")
+        return self.end_turn()
+
+    def gift_choose_target(self, target_id: str):
+        pending = self.pending_interactive
+        if not isinstance(pending, dict):
+            self.logs.append("[GIFT] No pending gift.")
+            return self.end_turn()
+        from event_effects import gift_orange_choose_target
+        kind, payload, new_pending = gift_orange_choose_target(
+            pending=pending,
+            target_id=target_id,
+        )
+        if kind == "need_gift_target":
+            self.pending_interactive = new_pending
+            return {
+                "role_id": pending.get("actor_id", ""),
+                "role_name": load_role_by_id(pending.get("actor_id", "")).get("name", pending.get("actor_id", "")),
+                "ui_mode": "GIFT_NEED_TARGET",
+                "targets": payload.get("targets", []),
+            }
+        self.pending_interactive = None
+        self.logs.append(f"[GIFT] {kind}: {payload}")
+        return self.end_turn()
+
+    def exchange_choose_target(self, target_id: str):
+        pending = self.pending_interactive
+        if not isinstance(pending, dict):
+            self.logs.append("[EXCHANGE] No pending exchange.")
+            return self.end_turn()
+        from event_effects import finn_exchange_orange_choose_target
+        kind, payload, new_pending = finn_exchange_orange_choose_target(
+            pending=pending,
+            target_id=target_id,
+        )
+        if kind == "need_exchange_target":
+            self.pending_interactive = new_pending
+            return {
+                "role_id": pending.get("actor_id", ""),
+                "role_name": load_role_by_id(pending.get("actor_id", "")).get("name", pending.get("actor_id", "")),
+                "ui_mode": "EXCHANGE_NEED_TARGET",
+                "targets": payload.get("targets", []),
+            }
+        self.pending_interactive = None
+        self.logs.append(f"[EXCHANGE] {kind}: {payload}")
+        return self.end_turn()
+
+    def exchange_choose_option(self, option_index: int):
+        pending = self.pending_interactive
+        if not isinstance(pending, dict):
+            self.logs.append("[EXCHANGE] No pending exchange choice.")
+            return self.end_turn()
+        from event_effects import finn_trade_stamina_choose, swap_items_choose
+        if pending.get("type") == "finn_trade_stamina":
+            kind, payload, new_pending = finn_trade_stamina_choose(
+                pending=pending,
+                option_index=option_index,
+            )
+        else:
+            kind, payload, new_pending = swap_items_choose(
+                pending=pending,
+                option_index=option_index,
+            )
+        if kind == "need_exchange_choice":
+            self.pending_interactive = new_pending
+            return {
+                "role_id": pending.get("actor_id", ""),
+                "role_name": load_role_by_id(pending.get("actor_id", "")).get("name", pending.get("actor_id", "")),
+                "ui_mode": "EXCHANGE_NEED_CHOICE",
+                "options": payload.get("options", []),
+            }
+        if kind == "need_exchange_consent":
+            self.pending_interactive = new_pending
+            return {
+                "role_id": pending.get("actor_id", ""),
+                "role_name": load_role_by_id(pending.get("actor_id", "")).get("name", pending.get("actor_id", "")),
+                "ui_mode": "EXCHANGE_NEED_CONSENT",
+                "target_id": payload.get("target_id", ""),
+            }
+        self.pending_interactive = None
+        self.logs.append(f"[EXCHANGE] {kind}: {payload}")
+        return self.end_turn()
+
+    def exchange_consent(self, agree: bool):
+        pending = self.pending_interactive
+        if not isinstance(pending, dict):
+            self.logs.append("[EXCHANGE] No pending exchange consent.")
+            return self.end_turn()
+        from event_effects import swap_items_consent
+        kind, payload, new_pending = swap_items_consent(pending=pending, agree=agree)
+        if kind == "need_consent" and isinstance(new_pending, dict) and new_pending.get("type") == "try_take_photo":
+            self.pending_interactive = new_pending
+            return {
+                "role_id": new_pending.get("actor_id", ""),
+                "role_name": load_role_by_id(new_pending.get("actor_id", "")).get("name", new_pending.get("actor_id", "")),
+                "ui_mode": "PHOTO_NEED_CONSENT",
+                "target_id": payload.get("target_id", ""),
+            }
+        self.pending_interactive = None
+        self.logs.append(f"[EXCHANGE] {kind}: {payload}")
+        return self.end_turn()
+
+    def volunteer_help(self, agree: bool):
+        if not self.pending_help:
+            return self.end_turn()
+        payload = self.pending_help
+        action_type = payload.get("action_type", "")
+        if not agree:
+            self.logs.append("[HELP] Declined.")
+            self.pending_help = None
+            # continue food offer if applicable
+            if action_type == "food":
+                from event_effects import offer_food_help
+                pending = payload.get("pending")
+                buyer_id = payload.get("buyer_id", "")
+                kind, pl, new_pending = offer_food_help(
+                    pending=pending,
+                    buyer_id=buyer_id,
+                    helped=False,
+                )
+                if kind == "need_food_decision":
+                    self.pending_interactive = new_pending
+                    return {
+                        "role_id": new_pending.get("actor_id", ""),
+                        "role_name": load_role_by_id(new_pending.get("actor_id", "")).get("name", new_pending.get("actor_id", "")),
+                        "ui_mode": "FOOD_OFFER_DECIDE",
+                        "target_id": pl.get("target_id", ""),
+                        "price": pl.get("price", 0),
+                    }
+                if kind == "need_food_force":
+                    self.pending_interactive = new_pending
+                    return {
+                        "role_id": new_pending.get("actor_id", ""),
+                        "role_name": load_role_by_id(new_pending.get("actor_id", "")).get("name", new_pending.get("actor_id", "")),
+                        "ui_mode": "FOOD_OFFER_FORCE",
+                        "target_id": pl.get("target_id", ""),
+                        "price": pl.get("price", 0),
+                    }
+            if action_type in ("perform_start", "perform_watch"):
+                from event_effects import perform_show_help
+                pending = payload.get("pending")
+                target_id = payload.get("target_id")
+                choice = payload.get("choice")
+                kind, pl, new_pending = perform_show_help(
+                    pending=pending,
+                    target_id=target_id,
+                    choice=choice,
+                    helped=False,
+                )
+                if kind == "need_perform_decision":
+                    self.pending_interactive = new_pending
+                    if isinstance(pl, dict):
+                        for line in pl.get("logs", []):
+                            self.logs.append(line)
+                    return {
+                        "role_id": new_pending.get("actor_id", ""),
+                        "role_name": load_role_by_id(new_pending.get("actor_id", "")).get("name", new_pending.get("actor_id", "")),
+                        "ui_mode": "PERFORM_WATCH_DECIDE",
+                        "target_id": pl.get("target_id", ""),
+                    }
+            return self.end_turn()
+        if "role_volunteer" not in self.players:
+            self.logs.append("[HELP] No volunteer in game.")
+            self.pending_help = None
+            return self.end_turn()
+
+        from event_effects import (
+            apply_photo_success_no_costs,
+            apply_trade_no_payment,
+            record_volunteer_help,
+            apply_finn_wear_no_cost,
+            add_status,
+        )
+
+        self.pending_help = None
+        if action_type == "photo":
+            apply_photo_success_no_costs(
+                actor_id=payload.get("actor_id", ""),
+                target_id=payload.get("target_id", ""),
+            )
+            record_volunteer_help("role_volunteer", "photo")
+            self.logs.append("[HELP] Photo completed by volunteer.")
+        elif action_type == "trade":
+            apply_trade_no_payment(
+                seller_id=payload.get("seller_id", ""),
+                buyer_id=payload.get("buyer_id", ""),
+                item_key=payload.get("item_key", ""),
+            )
+            record_volunteer_help("role_volunteer", "trade")
+            self.logs.append("[HELP] Trade completed by volunteer.")
+        elif action_type == "finn_wear":
+            actor_id = payload.get("actor_id", "")
+            apply_finn_wear_no_cost(actor_id=actor_id)
+            if payload.get("extra_curiosity"):
+                add_status(actor_id, "curiosity", 1)
+            record_volunteer_help("role_volunteer", "wear_orange")
+            self.logs.append("[HELP] Finn wear completed by volunteer.")
+        elif action_type == "food":
+            from event_effects import offer_food_help
+            pending = payload.get("pending")
+            buyer_id = payload.get("buyer_id", "")
+            kind, pl, new_pending = offer_food_help(
+                pending=pending,
+                buyer_id=buyer_id,
+                helped=True,
+            )
+            record_volunteer_help("role_volunteer", "food")
+            if kind == "need_food_decision":
+                self.pending_interactive = new_pending
+                self.logs.append("[HELP] Food offer continued by volunteer.")
+                return {
+                    "role_id": new_pending.get("actor_id", ""),
+                    "role_name": load_role_by_id(new_pending.get("actor_id", "")).get("name", new_pending.get("actor_id", "")),
+                    "ui_mode": "FOOD_OFFER_DECIDE",
+                    "target_id": pl.get("target_id", ""),
+                    "price": pl.get("price", 0),
+                }
+            if kind == "need_food_force":
+                self.pending_interactive = new_pending
+                self.logs.append("[HELP] Food offer continued by volunteer.")
+                return {
+                    "role_id": new_pending.get("actor_id", ""),
+                    "role_name": load_role_by_id(new_pending.get("actor_id", "")).get("name", new_pending.get("actor_id", "")),
+                    "ui_mode": "FOOD_OFFER_FORCE",
+                    "target_id": pl.get("target_id", ""),
+                    "price": pl.get("price", 0),
+                }
+            if isinstance(pl, dict):
+                for line in pl.get("logs", []):
+                    self.logs.append(line)
+            self.logs.append("[HELP] Food offer completed by volunteer.")
+        elif action_type in ("perform_start", "perform_watch"):
+            from event_effects import perform_show_help
+            pending = payload.get("pending")
+            target_id = payload.get("target_id")
+            choice = payload.get("choice")
+            kind, pl, new_pending = perform_show_help(
+                pending=pending,
+                target_id=target_id,
+                choice=choice,
+                helped=True,
+            )
+            record_volunteer_help("role_volunteer", "perform")
+            if kind == "need_perform_decision":
+                self.pending_interactive = new_pending
+                self.logs.append("[HELP] Performance continued by volunteer.")
+                if isinstance(pl, dict):
+                    for line in pl.get("logs", []):
+                        self.logs.append(line)
+                return {
+                    "role_id": new_pending.get("actor_id", ""),
+                    "role_name": load_role_by_id(new_pending.get("actor_id", "")).get("name", new_pending.get("actor_id", "")),
+                    "ui_mode": "PERFORM_WATCH_DECIDE",
+                    "target_id": pl.get("target_id", ""),
+                }
+            if isinstance(pl, dict):
+                for line in pl.get("logs", []):
+                    self.logs.append(line)
+            self.logs.append("[HELP] Performance resolved by volunteer.")
+        else:
+            self.logs.append("[HELP] Unknown action.")
         return self.end_turn()

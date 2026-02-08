@@ -9,13 +9,34 @@
       "id": "take_n_photo",
       "label_template": "拍 {n} 张照片",
       "param_defaults": { "n": 3 }
+    },
+    {
+      "id": "food_vendor_trade_dynamic",
+      "label_template": "卖出食物 {n} 次（人数动态）",
+      "param_defaults": { "n": 0 }
+    },
+    {
+      "id": "food_vendor_offer_goal",
+      "label_template": "成功供餐 {n} 次且至少 {n} 名玩家吃到食物",
+      "param_defaults": { "n": 3 }
+    },
+    {
+      "id": "perform_n_times",
+      "label_template": "完成表演 {n} 次",
+      "param_defaults": { "n": 3 }
+    },
+    {
+      "id": "volunteer_help_n_types",
+      "label_template": "帮助他人完成 {n} 种不同行为",
+      "param_defaults": { "n": 3 }
     }
   ],
   "trade_defaults": {
     "price_mod": 1,
     "price_override": {
       "product": 1,
-      "orange_product": 2
+      "orange_product": 2,
+      "food": 1
     }
   },
   "global_effect_defs": [

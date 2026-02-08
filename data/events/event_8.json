@@ -1,0 +1,35 @@
+{
+  "id": "event_swap",
+  "name": "顺手一换",
+  "global_effect": {
+    "id": "choose_event_target_only",
+    "label": "选择一名玩家（不可选自己），后续角色效果与该玩家交换",
+    "params": {}
+  },
+  "role_effects": {
+    "role_finn": {
+      "type": "interactive_action",
+      "id": "finn_swap_for_orange_event_target",
+      "params": {},
+      "label": "好奇心≥6：用任意物品交换对方橙色物品（不可拒绝）"
+    },
+    "role_tourist": {
+      "type": "interactive_action",
+      "id": "tourist_swap_or_photo_event_target",
+      "params": {},
+      "label": "用普通物品换对方橙色物品；若拒绝则强制拍照"
+    },
+    "role_vendor": {
+      "type": "interactive_action",
+      "id": "vendor_swap_event_target",
+      "params": {},
+      "label": "用普通/橙色物品交换对方普通/橙色物品；若拒绝则获得1金钱"
+    },
+    "role_food_vendor": {
+      "type": "interactive_action",
+      "id": "food_vendor_swap_event_target",
+      "params": {},
+      "label": "用普通/橙色物品交换对方普通/橙色物品；若拒绝则获得1金钱"
+    }
+  }
+}

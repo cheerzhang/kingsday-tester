@@ -12,6 +12,7 @@ GLOBAL_DEFS_PATH = os.path.join(ROOT, "data", "global_defs.json")
 
 REQUIRED_ROLE_IDS = {"role_finn", "role_tourist"}
 VENDOR_ROLE_ID = "role_vendor"
+FOOD_VENDOR_ROLE_ID = "role_food_vendor"
 
 # ======================
 # IO helpers
@@ -114,7 +115,7 @@ def init_game_runtime(selected_role_ids: list[str]) -> list[str]:
         }
 
         # vendor extra runtime fields (only init, no logic here)
-        if rid == VENDOR_ROLE_ID:
+        if rid in (VENDOR_ROLE_ID, FOOD_VENDOR_ROLE_ID):
             gs["counters"] = {
                 "trades_done": 0,
                 "trade_partners": []

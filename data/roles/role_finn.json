@@ -3,7 +3,7 @@
   "name": "Finn",
   "init_number": {
     "stamina": {
-      "number": 5,
+      "number": 3,
       "label": "体力"
     },
     "curiosity": {
@@ -31,12 +31,14 @@
     "logic": "THEN",
     "options": [
       {
-        "resource": "stamina",
-        "delta": -1
+        "costs": [
+          { "resource": "money", "delta": -1 }
+        ]
       },
       {
-        "resource": "curiosity",
-        "delta": -1
+        "costs": [
+          { "resource": "curiosity", "delta": -1 }
+        ]
       }
     ]
   },

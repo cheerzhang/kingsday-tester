@@ -250,6 +250,51 @@ class AutoPlayTab(ttk.Frame):
         if ui_mode == "PHOTO_NEED_CONSENT":
             agree = random.choice([True, False])
             return self.flow.photo_consent(agree)
+        if ui_mode == "HELP_DECISION":
+            agree = random.choice([True, False])
+            return self.flow.volunteer_help(agree)
+        if ui_mode == "FOOD_OFFER_DECIDE":
+            agree = random.choice([True, False])
+            return self.flow.food_offer_decide(info.get("target_id", ""), agree)
+        if ui_mode == "FOOD_OFFER_FORCE":
+            return self.flow.food_offer_decide(info.get("target_id", ""), True)
+        if ui_mode == "PERFORM_WATCH_DECIDE":
+            watch = random.choice([True, False])
+            return self.flow.perform_watch_decide(info.get("target_id", ""), watch)
+        if ui_mode == "PERFORM_WATCH_BENEFIT":
+            choice = random.choice(["stamina_plus_curiosity_minus", "money_minus_curiosity_plus"])
+            return self.flow.perform_watch_benefit(info.get("target_id", ""), choice)
+        if ui_mode == "GIFT_NEED_TARGET":
+            targets = info.get("targets", [])
+            if not targets:
+                return self.flow.end_turn()
+            target_id = random.choice(list(targets))
+            return self.flow.gift_choose_target(target_id)
+        if ui_mode == "EXCHANGE_NEED_TARGET":
+            targets = info.get("targets", [])
+            if not targets:
+                return self.flow.end_turn()
+            target_id = random.choice(list(targets))
+            return self.flow.exchange_choose_target(target_id)
+        if ui_mode == "EXCHANGE_NEED_CHOICE":
+            options = info.get("options", [])
+            if not options:
+                return self.flow.end_turn()
+            idx = random.randrange(len(options))
+            return self.flow.exchange_choose_option(idx)
+        if ui_mode == "EXCHANGE_NEED_CONSENT":
+            agree = random.choice([True, False])
+            return self.flow.exchange_consent(agree)
+        if ui_mode == "EVENT_NEED_TARGET":
+            targets = info.get("targets", [])
+            if not targets:
+                return self.flow.end_turn()
+            target_id = random.choice(list(targets))
+            return self.flow.event_choose_target(target_id)
+        if ui_mode == "WATCH_DECIDE":
+            target_id = info.get("target_id", "")
+            watch = random.choice([True, False])
+            return self.flow.watch_decide(target_id, watch)
 
         # ---------------------------
         # 互动：交易

@@ -1,0 +1,46 @@
+{
+  "id": "event_applause",
+  "name": "掌声不断",
+  "global_effect": {
+    "id": "current_player_stat_plus_and_minus",
+    "label": "当前玩家体力 -1，好奇心 -1",
+    "params": {
+      "stat_plus": "curiosity",
+      "amount_plus": -1,
+      "stat_minus": "stamina",
+      "amount_minus": -1
+    }
+  },
+  "role_effects": {
+    "role_performer": {
+      "type": "simple_effect",
+      "id": "performer_auto_success_if_stamina",
+      "params": {},
+      "label": "体力≥2，直接记一次表演成功"
+    },
+    "role_tourist": {
+      "type": "simple_effect",
+      "id": "tourist_photo_auto_if_performer_wear",
+      "params": {},
+      "label": "若表演者佩戴橙色物品，直接记一次拍照成功"
+    },
+    "role_finn": {
+      "type": "simple_effect",
+      "id": "current_player_stat_plus",
+      "params": { "stat": "product", "amount": 1 },
+      "label": "获得 1 件普通物品"
+    },
+    "role_vendor": {
+      "type": "interactive_action",
+      "id": "vendor_trade_orange_if_wearing",
+      "params": {},
+      "label": "若佩戴橙色可发起交易；选择佩戴橙色的玩家时不可拒绝"
+    },
+    "role_food_vendor": {
+      "type": "simple_effect",
+      "id": "food_price_double_global",
+      "params": {},
+      "label": "全局食物价格 ×2"
+    }
+  }
+}

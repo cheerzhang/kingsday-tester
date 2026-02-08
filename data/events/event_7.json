@@ -1,0 +1,35 @@
+{
+  "id": "event_interesting",
+  "name": "看起来很有意思",
+  "global_effect": {
+    "id": "choose_event_target",
+    "label": "选择一名玩家（不可选自己），该玩家好奇心 +1",
+    "params": {}
+  },
+  "role_effects": {
+    "role_finn": {
+      "type": "interactive_action",
+      "id": "finn_trade_stamina_by_item",
+      "params": {},
+      "label": "用普通物品换对方体力+1，或橙色物品换对方体力+3（不可拒绝）"
+    },
+    "role_tourist": {
+      "type": "interactive_action",
+      "id": "tourist_photo_event_target",
+      "params": {},
+      "label": "对选中的玩家发起拍照（不可拒绝）"
+    },
+    "role_vendor": {
+      "type": "interactive_action",
+      "id": "vendor_trade_event_target",
+      "params": {},
+      "label": "与选中的玩家发起交易（不可拒绝）"
+    },
+    "role_food_vendor": {
+      "type": "interactive_action",
+      "id": "food_offer_event_target",
+      "params": {},
+      "label": "对选中的玩家发起供餐（不可拒绝，成功则进度+1）"
+    }
+  }
+}

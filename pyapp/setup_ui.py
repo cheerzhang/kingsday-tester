@@ -328,6 +328,28 @@ class SetupTab(ttk.Frame):
 
         elif ui_mode == "PHOTO_NEED_CONSENT":
             self.show_photo_consent(info.get("target_id", ""))
+        elif ui_mode == "FOOD_OFFER_DECIDE":
+            self.show_food_offer_decide(info.get("target_id", ""), info.get("price", 0))
+        elif ui_mode == "FOOD_OFFER_FORCE":
+            self.show_food_offer_force(info.get("target_id", ""), info.get("price", 0))
+        elif ui_mode == "PERFORM_WATCH_DECIDE":
+            self.show_perform_watch_decide(info.get("target_id", ""))
+        elif ui_mode == "PERFORM_WATCH_BENEFIT":
+            self.show_perform_watch_benefit(info.get("target_id", ""))
+        elif ui_mode == "GIFT_NEED_TARGET":
+            self.show_gift_targets(info.get("targets", []))
+        elif ui_mode == "EXCHANGE_NEED_TARGET":
+            self.show_exchange_targets(info.get("targets", []))
+        elif ui_mode == "EXCHANGE_NEED_CHOICE":
+            self.show_exchange_choices(info.get("options", []))
+        elif ui_mode == "EXCHANGE_NEED_CONSENT":
+            self.show_exchange_consent(info.get("target_id", ""))
+        elif ui_mode == "EVENT_NEED_TARGET":
+            self.show_event_targets(info.get("targets", []))
+        elif ui_mode == "WATCH_DECIDE":
+            self.show_watch_decide(info.get("target_id", ""))
+        elif ui_mode == "HELP_DECISION":
+            self.show_help_decision(info.get("help_action", ""))
         # 2.3 抽卡后：个人效果选择（使用 / 不使用）
         elif info.get("post_role_effect_choice"):
             self.role_use_mode = "CARD_EFFECT"
@@ -401,10 +423,20 @@ class SetupTab(ttk.Frame):
         self.clear_action_buttons()
         self.cost_buttons = []
         for idx, opt in enumerate(choices):
-            res = str(opt.get("resource", ""))
-            delta = int(opt.get("delta", 0))
-            lab = RESOURCE_LABELS.get(res, res)
-            text = f"支付 {lab} {delta}"  # delta=-1 就显示 -1
+            costs = opt.get("costs")
+            if isinstance(costs, list) and costs:
+                parts = []
+                for c in costs:
+                    res = str(c.get("resource", ""))
+                    delta = int(c.get("delta", 0))
+                    lab = RESOURCE_LABELS.get(res, res)
+                    parts.append(f"{lab} {delta}")
+                text = "支付 " + " + ".join(parts)
+            else:
+                res = str(opt.get("resource", ""))
+                delta = int(opt.get("delta", 0))
+                lab = RESOURCE_LABELS.get(res, res)
+                text = f"支付 {lab} {delta}"  # delta=-1 就显示 -1
             btn = ttk.Button(
                 self.action_bar,
                 text=text,
@@ -653,6 +685,284 @@ class SetupTab(ttk.Frame):
         self.cost_buttons.append(btn_no)
         self.btn_role_skip.configure(text="取消")
         self.btn_role_skip.pack(side="left", padx=6)
+
+    def show_help_decision(self, action_type: str):
+        self.clear_action_buttons()
+        label = action_type or "action"
+        self.cost_buttons = []
+        btn_yes = ttk.Button(
+            self.action_bar,
+            text=f"志愿者帮助（{label}）",
+            command=lambda: self.on_help(True)
+        )
+        btn_yes.pack(side="left", padx=6)
+        self.cost_buttons.append(btn_yes)
+        btn_no = ttk.Button(
+            self.action_bar,
+            text="不帮助",
+            command=lambda: self.on_help(False)
+        )
+        btn_no.pack(side="left", padx=6)
+        self.cost_buttons.append(btn_no)
+
+    def on_help(self, agree: bool):
+        if not self.flow:
+            return
+        try:
+            info = self.flow.volunteer_help(agree)
+        except Exception as e:
+            messagebox.showerror("Help", f"volunteer_help failed:\n{e}")
+            return
+        self.enter_turn(info)
+
+    def show_food_offer_decide(self, target_id: str, price: int):
+        self.clear_action_buttons()
+        name = self.get_role_name(target_id)
+        self.cost_buttons = []
+        btn_yes = ttk.Button(
+            self.action_bar,
+            text=f"{name}：接受供餐 (-{price}金钱)",
+            command=lambda: self.on_food_offer(target_id, True)
+        )
+        btn_yes.pack(side="left", padx=6)
+        self.cost_buttons.append(btn_yes)
+        btn_no = ttk.Button(
+            self.action_bar,
+            text=f"{name}：不接受",
+            command=lambda: self.on_food_offer(target_id, False)
+        )
+        btn_no.pack(side="left", padx=6)
+        self.cost_buttons.append(btn_no)
+
+    def on_food_offer(self, target_id: str, accept: bool):
+        if not self.flow:
+            return
+        try:
+            info = self.flow.food_offer_decide(target_id, accept)
+        except Exception as e:
+            messagebox.showerror("Food Offer", f"food_offer_decide failed:\n{e}")
+            return
+        self.enter_turn(info)
+
+    def show_food_offer_force(self, target_id: str, price: int):
+        self.clear_action_buttons()
+        name = self.get_role_name(target_id)
+        self.cost_buttons = []
+        btn_yes = ttk.Button(
+            self.action_bar,
+            text=f"{name}：必须接受供餐 (-{price}金钱)",
+            command=lambda: self.on_food_offer(target_id, True)
+        )
+        btn_yes.pack(side="left", padx=6)
+        self.cost_buttons.append(btn_yes)
+
+    def show_perform_watch_decide(self, target_id: str):
+        self.clear_action_buttons()
+        name = self.get_role_name(target_id)
+        self.cost_buttons = []
+        btn_yes = ttk.Button(
+            self.action_bar,
+            text=f"{name}：围观",
+            command=lambda: self.on_perform_watch_decide(target_id, True)
+        )
+        btn_yes.pack(side="left", padx=6)
+        self.cost_buttons.append(btn_yes)
+        btn_no = ttk.Button(
+            self.action_bar,
+            text=f"{name}：不围观",
+            command=lambda: self.on_perform_watch_decide(target_id, False)
+        )
+        btn_no.pack(side="left", padx=6)
+        self.cost_buttons.append(btn_no)
+
+    def on_perform_watch_decide(self, target_id: str, watch: bool):
+        if not self.flow:
+            return
+        try:
+            info = self.flow.perform_watch_decide(target_id, watch)
+        except Exception as e:
+            messagebox.showerror("Perform", f"perform_watch_decide failed:\n{e}")
+            return
+        self.enter_turn(info)
+
+    def show_perform_watch_benefit(self, target_id: str):
+        self.clear_action_buttons()
+        name = self.get_role_name(target_id)
+        self.cost_buttons = []
+        btn_a = ttk.Button(
+            self.action_bar,
+            text=f"{name}：体力+1 好奇-1",
+            command=lambda: self.on_perform_watch_benefit(target_id, "stamina_plus_curiosity_minus")
+        )
+        btn_a.pack(side="left", padx=6)
+        self.cost_buttons.append(btn_a)
+        btn_b = ttk.Button(
+            self.action_bar,
+            text=f"{name}：金钱-1 好奇+1",
+            command=lambda: self.on_perform_watch_benefit(target_id, "money_minus_curiosity_plus")
+        )
+        btn_b.pack(side="left", padx=6)
+        self.cost_buttons.append(btn_b)
+
+    def on_perform_watch_benefit(self, target_id: str, choice: str):
+        if not self.flow:
+            return
+        try:
+            info = self.flow.perform_watch_benefit(target_id, choice)
+        except Exception as e:
+            messagebox.showerror("Perform", f"perform_watch_benefit failed:\n{e}")
+            return
+        self.enter_turn(info)
+
+    def show_gift_targets(self, targets: list[str]):
+        self.clear_action_buttons()
+        self.cost_buttons = []
+        for rid in targets:
+            name = self.get_role_name(rid)
+            btn = ttk.Button(
+                self.action_bar,
+                text=f"送给 {name}",
+                command=lambda r=rid: self.on_gift_target(r)
+            )
+            btn.pack(side="left", padx=6)
+            self.cost_buttons.append(btn)
+
+    def on_gift_target(self, target_id: str):
+        if not self.flow:
+            return
+        try:
+            info = self.flow.gift_choose_target(target_id)
+        except Exception as e:
+            messagebox.showerror("Gift", f"gift_choose_target failed:\n{e}")
+            return
+        self.enter_turn(info)
+
+    def show_exchange_targets(self, targets: list[str]):
+        self.clear_action_buttons()
+        self.cost_buttons = []
+        for rid in targets:
+            name = self.get_role_name(rid)
+            btn = ttk.Button(
+                self.action_bar,
+                text=f"与 {name} 交换",
+                command=lambda r=rid: self.on_exchange_target(r)
+            )
+            btn.pack(side="left", padx=6)
+            self.cost_buttons.append(btn)
+
+    def on_exchange_target(self, target_id: str):
+        if not self.flow:
+            return
+        try:
+            info = self.flow.exchange_choose_target(target_id)
+        except Exception as e:
+            messagebox.showerror("Exchange", f"exchange_choose_target failed:\n{e}")
+            return
+        self.enter_turn(info)
+
+    def show_exchange_choices(self, options: list[dict]):
+        self.clear_action_buttons()
+        self.cost_buttons = []
+        for idx, opt in enumerate(options):
+            label = str(opt.get("label", f"选项{idx+1}"))
+            btn = ttk.Button(
+                self.action_bar,
+                text=label,
+                command=lambda i=idx: self.on_exchange_choice(i)
+            )
+            btn.pack(side="left", padx=6)
+            self.cost_buttons.append(btn)
+
+    def on_exchange_choice(self, option_index: int):
+        if not self.flow:
+            return
+        try:
+            info = self.flow.exchange_choose_option(option_index)
+        except Exception as e:
+            messagebox.showerror("Exchange", f"exchange_choose_option failed:\n{e}")
+            return
+        self.enter_turn(info)
+
+    def show_exchange_consent(self, target_id: str):
+        self.clear_action_buttons()
+        name = self.get_role_name(target_id)
+        self.cost_buttons = []
+        btn_yes = ttk.Button(
+            self.action_bar,
+            text=f"{name}：同意交换",
+            command=lambda: self.on_exchange_consent(True)
+        )
+        btn_yes.pack(side="left", padx=6)
+        self.cost_buttons.append(btn_yes)
+        btn_no = ttk.Button(
+            self.action_bar,
+            text=f"{name}：拒绝交换",
+            command=lambda: self.on_exchange_consent(False)
+        )
+        btn_no.pack(side="left", padx=6)
+        self.cost_buttons.append(btn_no)
+
+    def on_exchange_consent(self, agree: bool):
+        if not self.flow:
+            return
+        try:
+            info = self.flow.exchange_consent(agree)
+        except Exception as e:
+            messagebox.showerror("Exchange", f"exchange_consent failed:\n{e}")
+            return
+        self.enter_turn(info)
+
+    def show_event_targets(self, targets: list[str]):
+        self.clear_action_buttons()
+        self.cost_buttons = []
+        for rid in targets:
+            name = self.get_role_name(rid)
+            btn = ttk.Button(
+                self.action_bar,
+                text=f"选择 {name}",
+                command=lambda r=rid: self.on_event_target(r)
+            )
+            btn.pack(side="left", padx=6)
+            self.cost_buttons.append(btn)
+
+    def on_event_target(self, target_id: str):
+        if not self.flow:
+            return
+        try:
+            info = self.flow.event_choose_target(target_id)
+        except Exception as e:
+            messagebox.showerror("Event", f"event_choose_target failed:\n{e}")
+            return
+        self.enter_turn(info)
+
+    def show_watch_decide(self, target_id: str):
+        self.clear_action_buttons()
+        name = self.get_role_name(target_id)
+        self.cost_buttons = []
+        btn_yes = ttk.Button(
+            self.action_bar,
+            text=f"{name}：围观",
+            command=lambda: self.on_watch_decide(target_id, True)
+        )
+        btn_yes.pack(side="left", padx=6)
+        self.cost_buttons.append(btn_yes)
+        btn_no = ttk.Button(
+            self.action_bar,
+            text=f"{name}：不围观",
+            command=lambda: self.on_watch_decide(target_id, False)
+        )
+        btn_no.pack(side="left", padx=6)
+        self.cost_buttons.append(btn_no)
+
+    def on_watch_decide(self, target_id: str, watch: bool):
+        if not self.flow:
+            return
+        try:
+            info = self.flow.watch_decide(target_id, watch)
+        except Exception as e:
+            messagebox.showerror("Event", f"watch_decide failed:\n{e}")
+            return
+        self.enter_turn(info)
     
     def on_trade_agree(self, agree: bool):
         """

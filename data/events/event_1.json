@@ -31,6 +31,18 @@
       "id": "vendor_price_double_all",
       "params": {},
       "label": "所有游戏中的商品交易价格 x2"
+    },
+    "role_food_vendor": {
+      "type": "interactive_action",
+      "id": "offer_food",
+      "params": { "bonus_stamina": 1 },
+      "label": "立刻发起供餐（本轮供餐体力+1）"
+    },
+    "role_performer": {
+      "type": "interactive_action",
+      "id": "performer_show_auto_success_if_wearing",
+      "params": {},
+      "label": "发起表演（若已佩戴橙色物品则无论围观结果都记一次成功）"
     }
   }
 }

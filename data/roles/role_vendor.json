@@ -31,12 +31,14 @@
     "logic": "THEN",
     "options": [
       {
-        "resource": "stamina",
-        "delta": -1
+        "costs": [
+          { "resource": "stamina", "delta": -1 }
+        ]
       },
       {
-        "resource": "money",
-        "delta": -1
+        "costs": [
+          { "resource": "money", "delta": -1 }
+        ]
       }
     ]
   },

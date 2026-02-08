@@ -1,0 +1,41 @@
+{
+  "id": "event_join_me",
+  "name": "你也来一下？",
+  "global_effect": {
+    "id": "current_player_curiosity_and_stamina_plus",
+    "label": "当前玩家好奇心 +1，体力 +1",
+    "params": {}
+  },
+  "role_effects": {
+    "role_finn": {
+      "type": "simple_effect",
+      "id": "current_player_stat_plus",
+      "params": { "stat": "product", "amount": 1 },
+      "label": "获得 1 件普通物品"
+    },
+    "role_tourist": {
+      "type": "interactive_action",
+      "id": "tourist_photo_or_swap_finn",
+      "params": {},
+      "label": "若表演者佩戴橙色则可拍照，否则必须与 Finn 交换"
+    },
+    "role_vendor": {
+      "type": "interactive_action",
+      "id": "vendor_trade_ignore_gate",
+      "params": {},
+      "label": "无视门槛发起交易"
+    },
+    "role_food_vendor": {
+      "type": "interactive_action",
+      "id": "food_offer_ignore_gate",
+      "params": {},
+      "label": "无视门槛发起供餐"
+    },
+    "role_performer": {
+      "type": "interactive_action",
+      "id": "performer_boost_and_perform",
+      "params": {},
+      "label": "体力 +2 并发起表演"
+    }
+  }
+}

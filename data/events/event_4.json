@@ -1,6 +1,6 @@
 {
   "id": "event_orange_4",
-  "name": "橙色皇冠 4",
+  "name": "这件衣服不合适",
   "global_effect": {
     "id": "current_and_lowest_curiosity_plus",
     "label": "抽卡者与好奇心最低的玩家好奇心 +1",
@@ -24,6 +24,18 @@
       "id": "vendor_trade_lowest_curiosity",
       "params": {},
       "label": "与好奇心最低的玩家发起交易（不可拒绝）"
+    },
+    "role_food_vendor": {
+      "type": "interactive_action",
+      "id": "food_vendor_offer_lowest_force",
+      "params": {},
+      "label": "若最低好奇心玩家>=2，则对其发起供餐（不可拒绝）"
+    },
+    "role_performer": {
+      "type": "interactive_action",
+      "id": "performer_auto_success_if_lowest_curiosity_ge2_else_perform",
+      "params": {},
+      "label": "若最低好奇心玩家>=2，直接记一次表演成功；否则发起表演"
     }
   }
 }

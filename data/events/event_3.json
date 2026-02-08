@@ -23,6 +23,18 @@
       "params": {},
       "label": "给任意玩家穿上并对其发起拍照"
     },
-    "role_vendor": null
+    "role_vendor": null,
+    "role_food_vendor": {
+      "type": "interactive_action",
+      "id": "food_vendor_gift_orange",
+      "params": {},
+      "label": "选择一名玩家送出 1 件橙色物品（未佩戴），自己体力 +1"
+    },
+    "role_performer": {
+      "type": "interactive_action",
+      "id": "performer_wear_or_perform_required1",
+      "params": {},
+      "label": "未佩戴则戴上；已佩戴则发起表演（本次只需 1 人围观成功）"
+    }
   }
 }

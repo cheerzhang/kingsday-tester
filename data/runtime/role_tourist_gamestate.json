@@ -2,7 +2,7 @@
   "role_id": "role_tourist",
   "status": {
     "stamina": 4,
-    "curiosity": 2,
+    "curiosity": 3,
     "money": 5,
     "product": 1,
     "orange_product": 0,

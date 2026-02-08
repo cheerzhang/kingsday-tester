@@ -1,17 +1,17 @@
 {
-  "id": "role_tourist",
-  "name": "游客",
+  "id": "role_food_vendor",
+  "name": "食物摊主",
   "init_number": {
     "stamina": {
-      "number": 4,
+      "number": 3,
       "label": "体力"
     },
     "curiosity": {
-      "number": 2,
+      "number": 1,
       "label": "好奇心"
     },
     "money": {
-      "number": 6,
+      "number": 0,
       "label": "金钱"
     },
     "product": {
@@ -28,13 +28,8 @@
     }
   },
   "draw_card_cost": {
-    "logic": "OR",
+    "logic": "THEN",
     "options": [
-      {
-        "costs": [
-          { "resource": "money", "delta": -1 }
-        ]
-      },
       {
         "costs": [
           { "resource": "curiosity", "delta": -1 }
@@ -43,12 +38,14 @@
     ]
   },
   "victory": {
-    "id": "take_n_photo",
-    "params": { "n": 5 }
+    "id": "food_vendor_offer_goal",
+    "params": { "n": 3 }
   },
+  "trade_state_init": {}
+  ,
   "active_skill": {
     "type": "interactive",
-    "id": "try_take_photo",
-    "params": { }
+    "id": "offer_food",
+    "params": {}
   }
 }

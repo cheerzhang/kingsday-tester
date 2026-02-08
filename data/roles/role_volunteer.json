@@ -1,9 +1,9 @@
 {
-  "id": "role_tourist",
-  "name": "游客",
+  "id": "role_volunteer",
+  "name": "志愿者",
   "init_number": {
     "stamina": {
-      "number": 4,
+      "number": 2,
       "label": "体力"
     },
     "curiosity": {
@@ -11,7 +11,7 @@
       "label": "好奇心"
     },
     "money": {
-      "number": 6,
+      "number": 5,
       "label": "金钱"
     },
     "product": {
@@ -28,7 +28,7 @@
     }
   },
   "draw_card_cost": {
-    "logic": "OR",
+    "logic": "THEN",
     "options": [
       {
         "costs": [
@@ -37,18 +37,13 @@
       },
       {
         "costs": [
-          { "resource": "curiosity", "delta": -1 }
+          { "resource": "stamina", "delta": -1 }
         ]
       }
     ]
   },
   "victory": {
-    "id": "take_n_photo",
-    "params": { "n": 5 }
-  },
-  "active_skill": {
-    "type": "interactive",
-    "id": "try_take_photo",
-    "params": { }
+    "id": "volunteer_help_n_types",
+    "params": { "n": 3 }
   }
 }

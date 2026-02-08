@@ -27,6 +27,18 @@
       "id": "vendor_orange_price_plus_2",
       "params": {},
       "label": "摊主橙色物品售价 +2"
+    },
+    "role_food_vendor": {
+      "type": "simple_effect",
+      "id": "food_vendor_orange_supply_boost",
+      "params": { "cost_plus": 1, "bonus_stamina": 1 },
+      "label": "若已穿橙色，则后续供餐代价+1、体力收益+1"
+    },
+    "role_performer": {
+      "type": "interactive_action",
+      "id": "performer_wear_or_perform_required1",
+      "params": {},
+      "label": "未佩戴则戴上；已佩戴则发起表演（本次只需 1 人围观成功）"
     }
   }
 }
