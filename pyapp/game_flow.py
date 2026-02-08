@@ -2,7 +2,7 @@ import os
 import json
 import random
 
-from game_logic import load_current_game, load_player_gamestate
+from game_logic import load_current_game, load_player_gamestate, is_game_over
 from core_logic import (
     load_role_by_id,
     check_draw_card_eligibility,
@@ -97,9 +97,8 @@ class GameFlow:
         return self.start_turn()
 
     def is_game_over(self) -> bool:
-        cur = load_current_game()
-        return bool(cur.get("game_over"))
-    
+        return is_game_over()
+
     def game_end(self):
         winners = self.calc_winners(self.players)
         if not winners:
@@ -124,8 +123,7 @@ class GameFlow:
     # ----------------------
     def start_turn(self):
         # 🛑 先检查游戏是否结束
-        cur = load_current_game()
-        if cur.get("game_over"):
+        if self.is_game_over():
             return self.game_end()
         
         rid = self.players[self.turn_index]

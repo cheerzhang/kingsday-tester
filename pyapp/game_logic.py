@@ -146,6 +146,10 @@ def load_current_game():
         {"players": [], "game_over": False, "game_over_reason": ""}
     )
 
+def is_game_over() -> bool:
+    cur = load_current_game()
+    return bool(cur.get("game_over"))
+
 def load_player_gamestate(role_id: str) -> dict:
     return _load_json(
         role_gamestate_path(role_id),
@@ -192,8 +196,7 @@ def run_game_loop(player_turn_fn):
 
     idx = 0
     while True:
-        cur = load_current_game()
-        if cur.get("game_over"):
+        if is_game_over():
             break
 
         rid = players[idx % len(players)]

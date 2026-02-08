@@ -9,6 +9,7 @@ from game_logic import (
     init_game_runtime,
     load_all_roles_min,
     load_current_game,
+    is_game_over,
     reset_runtime,
 )
 from game_flow import GameFlow
@@ -204,8 +205,7 @@ class AutoPlayTab(ttk.Frame):
         
 
         # game over?
-        cur = load_current_game()
-        if cur.get("game_over"):
+        if is_game_over():
             self.append_logs()
             self.set_running(False)
             self.status_var.set("Game Over.")
