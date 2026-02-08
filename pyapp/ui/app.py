@@ -54,7 +54,3 @@ class MainApp(tk.Tk):
         # Tab 4: AutoPlay
         tab4 = AutoPlayTab(nb)
         nb.add(tab4, text="Auto Play")
-
-def run_app():
-    app = MainApp()
-    app.mainloop()

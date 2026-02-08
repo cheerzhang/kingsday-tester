@@ -164,13 +164,6 @@ class GameFlow:
         self.logs.append("[TURN] Skip.")
         return self.end_turn()
 
-    def use_skill(self):
-        """
-        Placeholder for active skill.
-        """
-        self.logs.append("[SKILL] (not implemented)")
-        return self.end_turn()
-
     # ----------------------
     # Draw card flow
     # ----------------------

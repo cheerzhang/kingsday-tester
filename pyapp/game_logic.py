@@ -171,35 +171,3 @@ def reset_runtime():
                 os.remove(os.path.join(RUNTIME_DIR, fn))
             except Exception:
                 pass
-
-# ======================
-# Game loop driver (VERY THIN)
-# ======================
-def run_game_loop(player_turn_fn):
-    """
-    Drive the game loop.
-
-    player_turn_fn signature:
-        player_turn_fn(role_id: str) -> None
-
-    Flow:
-      while not game_over:
-        for each player:
-          if game_over: break
-          call player_turn_fn(role_id)
-    """
-    cur = load_current_game()
-    players = cur.get("players", [])
-
-    if not players:
-        return
-
-    idx = 0
-    while True:
-        if is_game_over():
-            break
-
-        rid = players[idx % len(players)]
-        player_turn_fn(rid)
-
-        idx += 1
