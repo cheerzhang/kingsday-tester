@@ -92,7 +92,6 @@ class GameFlow:
         self.pending_cost_choice = None
 
         self.logs.append("=== Game Started ===")
-        self.log_all_player_status()
 
         return self.start_turn()
 
@@ -111,7 +110,6 @@ class GameFlow:
                 names.append(role.get("name", rid))
             self.logs.append("\n=== GAME OVER ===")
             self.logs.append("Winner(s): " + ", ".join(names))
-        self.log_all_player_status()
         update_winrate(self.players, winners)
         return {
             "game_over": True,
@@ -263,7 +261,6 @@ class GameFlow:
         skill = role.get("active_skill")
         if not isinstance(skill, dict):
             self.logs.append("[SKILL] No active_skill.")
-            self.log_all_player_status()
             return self.end_turn()
 
         effect_id = str(skill.get("id", "")).strip()
@@ -273,7 +270,6 @@ class GameFlow:
 
         if not effect_id:
             self.logs.append("[SKILL] Invalid skill id.")
-            self.log_all_player_status()
             return self.end_turn()
 
         self.logs.append(f"[SKILL] Execute: {effect_id}")
@@ -287,7 +283,6 @@ class GameFlow:
             )
         except Exception as e:
             self.logs.append(f"[SKILL] Execute failed: {e}")
-            self.log_all_player_status()
             return self.end_turn()
 
         # 互动技能：交给 UI（不 end_turn）
@@ -342,13 +337,11 @@ class GameFlow:
             self.logs.append(f"[SKILL] {kind}: {payload}")
 
         # 非互动：打印状态 & 结束回合
-        self.log_all_player_status()
         return self.end_turn()
 
 
     def skip_turn(self):
         self.logs.append("[SKIP] Do nothing.")
-        self.log_all_player_status()
         return self.end_turn()
     
     # ----------------------
@@ -358,7 +351,6 @@ class GameFlow:
         result = self.draw_random_event_and_log(current_player_id)
         if not result:
             self.logs.append("[EVENT] draw failed.")
-            self.log_all_player_status()
             return self.end_turn()
         ev = result["event"]
         effect_id = result["global_effect_id"]
@@ -409,7 +401,6 @@ class GameFlow:
                 "role_effect_id": str(reff.get("id", "")).strip(),
             }
         # =======================================================
-        self.log_all_player_status()
         return self.end_turn()
 
     def draw_random_event_and_log(self, current_player_id: str):
@@ -536,7 +527,6 @@ class GameFlow:
     
     def skip_role_effect(self):
         self.pending_role_effect = None
-        self.log_all_player_status()
         return self.end_turn()
     
     # ----------------------
@@ -578,7 +568,6 @@ class GameFlow:
             )
         except Exception as e:
             self.logs.append(f"[ROLE_EFFECT] Execute failed: {e}")
-            self.log_all_player_status()
             return self.end_turn()
 
         # 3️⃣ 处理返回值（互动/非互动）
@@ -642,12 +631,10 @@ class GameFlow:
             if kind in ("done", "fail"):
                 self.pending_interactive = None
                 self.logs.append(f"[ROLE_EFFECT] {kind}: {payload}")
-                self.log_all_player_status()
                 return self.end_turn()
 
         # 4️⃣ 非互动：默认当作执行完成，结束回合
         self.pending_interactive = None
-        self.log_all_player_status()
         return self.end_turn()
     
 
@@ -683,7 +670,6 @@ class GameFlow:
                 "targets": payload.get("targets", []),
             }
 
-        self.log_all_player_status()
         return self.end_turn()
 
 
@@ -700,7 +686,6 @@ class GameFlow:
             save_gs_fn=save_gamestate,  # 你需要有这个函数（下面说明）
         )
         self.logs.append(f"[PHOTO] {kind}: {payload}")
-        self.log_all_player_status()
         return self.end_turn()
     
     # ----------------------
@@ -743,7 +728,6 @@ class GameFlow:
 
         # fail / done
         self.logs.append(f"[TRADE] {kind}: {payload}")
-        self.log_all_player_status()
         return self.end_turn()
     
     def trade_choose_partner(self, partner_id: str):
@@ -783,7 +767,6 @@ class GameFlow:
 
         # fail / done
         self.logs.append(f"[TRADE] {kind}: {payload}")
-        self.log_all_player_status()
         return self.end_turn()
     
     def trade_consent(self, agree: bool):
@@ -800,5 +783,4 @@ class GameFlow:
             save_gs_fn=save_gamestate,
         )
         self.logs.append(f"[TRADE] {kind}: {payload}")
-        self.log_all_player_status()
         return self.end_turn()
