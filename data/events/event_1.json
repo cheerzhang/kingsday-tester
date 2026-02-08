@@ -24,9 +24,9 @@
       "params": { "photo": 1 }
     },
     "role_vendor": {
-      "type": "interactive_action",
-      "id": "try_trade",
-      "params": { "photo": 1 }
+      "type": "simple_effect",
+      "id": "vendor_price_double_all",
+      "params": {}
     }
   }
 }

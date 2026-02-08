@@ -795,6 +795,34 @@ def compute_trade_price(*, seller_gs: dict, item_key: str) -> int:
     return max(1, price)
 
 # =========================
+# Vendor price helpers
+# =========================
+
+def apply_price_multiplier_all_players(*, players: list[str], factor: int):
+    if not isinstance(players, list):
+        return
+    try:
+        factor = int(factor)
+    except Exception:
+        factor = 1
+    if factor <= 1:
+        return
+    for rid in players:
+        if not rid:
+            continue
+        gs = load_role_gamestate(rid)
+        trade_state = gs.get("trade_state")
+        if not isinstance(trade_state, dict):
+            trade_state = {}
+            gs["trade_state"] = trade_state
+        try:
+            mod = int(trade_state.get("price_mod", 1))
+        except Exception:
+            mod = 1
+        trade_state["price_mod"] = max(1, mod * factor)
+        save_role_gamestate(rid, gs)
+
+# =========================
 # Role-card effect registry
 # =========================
 
@@ -862,3 +890,8 @@ def rc_try_take_photo(*, actor_id: str, params: dict, players=None):
 def rc_try_trade(*, actor_id: str, params: dict, players=None):
     players = players if isinstance(players, list) else []
     return try_trade_start(actor_id=actor_id, players=players, params=params)
+
+@register_rolecard_effect("vendor_price_double_all")
+def rc_vendor_price_double_all(*, actor_id: str, params: dict, players=None):
+    players = players if isinstance(players, list) else []
+    apply_price_multiplier_all_players(players=players, factor=2)
