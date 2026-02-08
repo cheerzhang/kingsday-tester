@@ -108,6 +108,9 @@ class GameFlow:
         apply_cost_option(role_id, {"resource": "stamina", "delta": -1})
         apply_cost_option(role_id, {"resource": "orange_product", "delta": -1})
 
+    def _apply_finn_wear_progress(self, role_id: str):
+        apply_cost_option(role_id, {"resource": "progress", "delta": 1})
+
     # ----------------------
     # Game lifecycle
     # ----------------------
@@ -316,6 +319,7 @@ class GameFlow:
                 self.logs.append(reason)
                 return self.end_turn()
             self._apply_finn_wear_costs(rid)
+            self._apply_finn_wear_progress(rid)
             self.logs.append("[SKILL] Finn wear success: stamina -1, orange_product -1, orange_wear_product +1")
 
         self.logs.append(f"[SKILL] Execute: {effect_id}")
