@@ -326,9 +326,11 @@ class SetupTab(ttk.Frame):
     def on_no_draw(self):
         if not hasattr(self, "flow") or not self.flow:
             return
-        info = self.flow.request_no_draw_choice()
+        self.flow.request_no_draw_choice()
         self.append_flow_logs()
-        self.flow.skip_turn()
+        info = self.flow.skip_turn()
+        self.append_flow_logs()
+        self.enter_turn(info)
 
 
     def on_draw(self):
