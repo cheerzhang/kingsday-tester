@@ -46,13 +46,7 @@
       "n": 3
     }
   },
-  "trade_state_init": {
-    "price_mod": 1,
-    "price_override": {
-      "product": 1,
-      "orange_product": 2
-    }
-  },
+  "trade_state_init": {},
   "active_skill": {
     "type": "interactive",
     "id": "try_trade",

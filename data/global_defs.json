@@ -11,6 +11,13 @@
       "param_defaults": { "n": 3 }
     }
   ],
+  "trade_defaults": {
+    "price_mod": 1,
+    "price_override": {
+      "product": 1,
+      "orange_product": 2
+    }
+  },
   "global_effect_defs": [
     {
       "id": "all_role_stat_plus",
@@ -42,6 +49,15 @@
       "id": "game_end_immediately",
       "label_template": "游戏立刻结束",
       "param_defaults": {}
+    },
+    {
+      "id": "trade_price_multiplier",
+      "label_template": "所有玩家交易价格 x{factor}",
+      "param_defaults": {
+        "factor": 2,
+        "item_keys": ["product", "orange_product"],
+        "scope": "all_players"
+      }
     }
   ]
 }

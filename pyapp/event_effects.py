@@ -7,6 +7,7 @@ import os
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 RUNTIME_DIR = os.path.join(ROOT, "data", "runtime")
 GAME_FILE = os.path.join(RUNTIME_DIR, "current_game.json")
+GLOBAL_DEFS_PATH = os.path.join(ROOT, "data", "global_defs.json")
 
 def _ensure_runtime():
     os.makedirs(RUNTIME_DIR, exist_ok=True)
@@ -26,6 +27,13 @@ def load_json(path, default):
     except Exception:
         return default
 
+def _load_trade_defaults() -> dict:
+    obj = load_json(GLOBAL_DEFS_PATH, {})
+    td = obj.get("trade_defaults")
+    if not isinstance(td, dict):
+        return {"price_mod": 1, "price_override": {"product": 1, "orange_product": 2}}
+    return td
+
 def save_json(path, obj):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(obj, f, ensure_ascii=False, indent=2)
@@ -37,6 +45,13 @@ def load_current_game():
         "game_over": False,
         "game_over_reason": ""
     })
+
+def _ensure_global_trade_state(g: dict) -> dict:
+    gts = g.get("global_trade_state")
+    if not isinstance(gts, dict):
+        gts = {}
+        g["global_trade_state"] = gts
+    return gts
 
 def save_current_game(obj: dict):
     _ensure_runtime()
@@ -771,7 +786,8 @@ def compute_trade_price(*, seller_gs: dict, item_key: str) -> int:
     - 否则默认：product=1, orange_product=2
     再乘以 seller_gs["trade_state"]["price_mod"] (默认 1)
     """
-    base_map = {"product": 1, "orange_product": 2}
+    defaults = _load_trade_defaults()
+    base_map = defaults.get("price_override", {"product": 1, "orange_product": 2})
 
     trade_state = seller_gs.get("trade_state")
     if not isinstance(trade_state, dict):
@@ -791,7 +807,17 @@ def compute_trade_price(*, seller_gs: dict, item_key: str) -> int:
     except Exception:
         mod = 1
 
-    price = base * max(1, mod)
+    # apply global trade multiplier (if any)
+    global_mod = 1
+    g = load_current_game()
+    gts = g.get("global_trade_state")
+    if isinstance(gts, dict):
+        try:
+            global_mod = int(gts.get("price_mod", 1))
+        except Exception:
+            global_mod = 1
+
+    price = base * max(1, mod) * max(1, global_mod)
     return max(1, price)
 
 # =========================
@@ -821,6 +847,16 @@ def apply_price_multiplier_all_players(*, players: list[str], factor: int):
             mod = 1
         trade_state["price_mod"] = max(1, mod * factor)
         save_role_gamestate(rid, gs)
+
+def apply_price_multiplier_global(*, factor: int):
+    g = load_current_game()
+    gts = _ensure_global_trade_state(g)
+    try:
+        cur = int(gts.get("price_mod", 1))
+    except Exception:
+        cur = 1
+    gts["price_mod"] = max(1, cur * int(factor))
+    save_current_game(g)
 
 # =========================
 # Role-card effect registry
@@ -893,5 +929,4 @@ def rc_try_trade(*, actor_id: str, params: dict, players=None):
 
 @register_rolecard_effect("vendor_price_double_all")
 def rc_vendor_price_double_all(*, actor_id: str, params: dict, players=None):
-    players = players if isinstance(players, list) else []
-    apply_price_multiplier_all_players(players=players, factor=2)
+    apply_price_multiplier_global(factor=2)

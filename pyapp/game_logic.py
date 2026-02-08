@@ -8,6 +8,7 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 ROLES_DIR = os.path.join(ROOT, "data", "roles")
 RUNTIME_DIR = os.path.join(ROOT, "data", "runtime")
 CURRENT_GAME_PATH = os.path.join(RUNTIME_DIR, "current_game.json")
+GLOBAL_DEFS_PATH = os.path.join(ROOT, "data", "global_defs.json")
 
 REQUIRED_ROLE_IDS = {"role_finn", "role_tourist"}
 VENDOR_ROLE_ID = "role_vendor"
@@ -26,6 +27,13 @@ def _load_json(path, default):
         return obj if isinstance(obj, dict) else default
     except Exception:
         return default
+
+def _load_trade_defaults() -> dict:
+    obj = _load_json(GLOBAL_DEFS_PATH, {})
+    td = obj.get("trade_defaults")
+    if not isinstance(td, dict):
+        return {"price_mod": 1, "price_override": {"product": 1, "orange_product": 2}}
+    return td
 
 def _save_json(path, obj):
     with open(path, "w", encoding="utf-8") as f:
@@ -117,20 +125,30 @@ def init_game_runtime(selected_role_ids: list[str]) -> list[str]:
                 "trades_done": 0,
                 "unique_partners": 0
             }
+            defaults = _load_trade_defaults()
+            base_state = {
+                "price_mod": int(defaults.get("price_mod", 1)),
+                "price_override": dict(defaults.get("price_override", {}) or {}),
+            }
             tsi = role.get("trade_state_init", {})
             if isinstance(tsi, dict):
-                gs["trade_state"] = json.loads(json.dumps(tsi))  # deep copy
-            else:
-                gs["trade_state"] = {"price_mod": 1, "price_override": {"product": 1, "orange_product": 2}}
+                # merge role overrides on top of defaults
+                override = json.loads(json.dumps(tsi))
+                base_state.update(override)
+            gs["trade_state"] = base_state
 
         _save_json(role_gamestate_path(rid), gs)
 
     # write current_game.json
+    defaults = _load_trade_defaults()
     cur = {
         "players": chosen,
         "game_over": False,
         "game_over_reason": "",
-        "events_drawn": []
+        "events_drawn": [],
+        "global_trade_state": {
+            "price_mod": int(defaults.get("price_mod", 1))
+        }
     }
     _save_json(CURRENT_GAME_PATH, cur)
 
