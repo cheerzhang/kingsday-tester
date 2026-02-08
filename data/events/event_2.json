@@ -1,0 +1,31 @@
+{
+  "id": "event_get_orange_1",
+  "name": "橙色皇冠",
+  "global_effect": {
+    "id": "current_player_stat_plus",
+    "params": {
+      "stat": "orange_product",
+      "amount": 1
+    }
+  },
+  "role_effects": {
+    "role_finn": {
+      "type": "simple_effect",
+      "id": "current_player_stat_plus",
+      "params": {
+        "stat": "orange_product",
+        "amount": 1
+      }
+    },
+    "role_tourist": {
+      "type": "interactive_action",
+      "id": "try_take_photo",
+      "params": { "photo": 1 }
+    },
+    "role_vendor": {
+      "type": "interactive_action",
+      "id": "try_trade",
+      "params": { "photo": 1 }
+    }
+  }
+}

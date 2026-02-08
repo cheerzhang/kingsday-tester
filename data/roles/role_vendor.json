@@ -1,0 +1,61 @@
+{
+  "id": "role_vendor",
+  "name": "Vendor",
+  "init_number": {
+    "stamina": {
+      "number": 6,
+      "label": "体力"
+    },
+    "curiosity": {
+      "number": 2,
+      "label": "好奇心"
+    },
+    "money": {
+      "number": 0,
+      "label": "金钱"
+    },
+    "product": {
+      "number": 2,
+      "label": "普通物品"
+    },
+    "orange_product": {
+      "number": 1,
+      "label": "橙色物品(未佩戴)"
+    },
+    "orange_wear_product": {
+      "number": 0,
+      "label": "橙色物品(已佩戴)"
+    }
+  },
+  "draw_card_cost": {
+    "logic": "THEN",
+    "options": [
+      {
+        "resource": "stamina",
+        "delta": -1
+      },
+      {
+        "resource": "money",
+        "delta": -1
+      }
+    ]
+  },
+  "victory": {
+    "id": "vendor_trade_dynamic",
+    "params": {
+      "n": 3
+    }
+  },
+  "trade_state_init": {
+    "price_mod": 1,
+    "price_override": {
+      "product": 1,
+      "orange_product": 2
+    }
+  },
+  "active_skill": {
+    "type": "interactive",
+    "id": "try_trade",
+    "params": { }
+  }
+}

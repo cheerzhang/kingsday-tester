@@ -1,0 +1,32 @@
+{
+  "id": "event_orange_crown",
+  "name": "全城橙色",
+  "global_effect": {
+    "id": "all_role_stat_plus",
+    "params": {
+      "amount": 1,
+      "stat": "curiosity"
+    }
+  },
+
+  "role_effects": {
+    "role_finn": {
+      "type": "simple_effect",
+      "id": "current_player_stat_plus",
+      "params": {
+        "stat": "orange_product",
+        "amount": 1
+      }
+    },
+    "role_tourist": {
+      "type": "interactive_action",
+      "id": "try_take_photo",
+      "params": { "photo": 1 }
+    },
+    "role_vendor": {
+      "type": "interactive_action",
+      "id": "try_trade",
+      "params": { "photo": 1 }
+    }
+  }
+}

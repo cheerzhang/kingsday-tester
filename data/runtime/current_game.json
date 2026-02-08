@@ -1,0 +1,13 @@
+{
+  "players": [
+    "role_finn",
+    "role_tourist"
+  ],
+  "game_over": true,
+  "game_over_reason": "event_game_over",
+  "events_drawn": [
+    "event_1.json",
+    "event_2.json",
+    "event_0.json"
+  ]
+}

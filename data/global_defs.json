@@ -1,0 +1,47 @@
+{
+  "victory_defs": [
+    {
+      "id": "wear_n_orange_items",
+      "label_template": "穿上 {n} 件橙色物品",
+      "param_defaults": { "n": 3 }
+    },
+    {
+      "id": "take_n_photo",
+      "label_template": "拍 {n} 张照片",
+      "param_defaults": { "n": 3 }
+    }
+  ],
+  "global_effect_defs": [
+    {
+      "id": "all_role_stat_plus",
+      "label_template": "所有玩家 {stat} 增加 {amount}",
+      "param_defaults": {
+        "stat": "curiosity",
+        "amount": 1
+      },
+      "param_labels": {
+        "stat": {
+          "curiosity": "好奇心",
+          "money": "金钱",
+          "stamina": "体力"
+        }
+      }
+    },
+    {
+      "id": "current_player_stat_plus",
+      "label_template": "获得{amount}件{stat}",
+      "param_defaults": { "stat": "orange_product", "amount": 1 },
+      "param_labels": {
+        "stat": {
+          "orange_product": "橙色物品",
+          "curiosity": "好奇心"
+        }
+      }
+    },
+    {
+      "id": "game_end_immediately",
+      "label_template": "游戏立刻结束",
+      "param_defaults": {}
+    }
+  ]
+}

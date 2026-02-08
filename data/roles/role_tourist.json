@@ -1,0 +1,52 @@
+{
+  "id": "role_tourist",
+  "name": "游客",
+  "init_number": {
+    "stamina": {
+      "number": 4,
+      "label": "体力"
+    },
+    "curiosity": {
+      "number": 2,
+      "label": "好奇心"
+    },
+    "money": {
+      "number": 6,
+      "label": "金钱"
+    },
+    "product": {
+      "number": 1,
+      "label": "普通物品"
+    },
+    "orange_product": {
+      "number": 0,
+      "label": "橙色物品(未佩戴)"
+    },
+    "orange_wear_product": {
+      "number": 0,
+      "label": "橙色物品(已佩戴)"
+    }
+  },
+  "draw_card_cost": {
+    "logic": "OR",
+    "options": [
+      {
+        "resource": "money",
+        "delta": -1
+      },
+      {
+        "resource": "curiosity",
+        "delta": -1
+      }
+    ]
+  },
+  "victory": {
+    "id": "take_n_photo",
+    "params": { "n": 3 }
+  },
+  "active_skill": {
+    "type": "interactive",
+    "id": "try_take_photo",
+    "params": { }
+  }
+}
