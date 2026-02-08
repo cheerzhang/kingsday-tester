@@ -206,6 +206,9 @@ class AutoPlayTab(ttk.Frame):
 
         # game over?
         if is_game_over():
+            # finalize game once: compute winners + update winrate + log
+            if not (isinstance(self.info, dict) and self.info.get("game_over")):
+                self.info = self.flow.game_end() if self.flow else self.info
             self.append_logs()
             self.set_running(False)
             self.status_var.set("Game Over.")
