@@ -1,11 +1,11 @@
 {
-  "total_games": 54,
+  "total_games": 56,
   "by_player_set": {
     "role_finn|role_tourist": {
-      "games": 34,
+      "games": 36,
       "wins": {
-        "role_finn": 30,
-        "role_tourist": 34
+        "role_finn": 32,
+        "role_tourist": 36
       }
     },
     "role_finn|role_tourist|role_vendor": {
