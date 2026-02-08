@@ -78,6 +78,37 @@ class GameFlow:
         self.event_defs = load_event_effect_defs()
 
     # ----------------------
+    # Finn skill helpers
+    # ----------------------
+    def _get_status_int(self, gs: dict, key: str) -> int:
+        st = gs.get("status")
+        if not isinstance(st, dict):
+            return 0
+        try:
+            return int(st.get(key, 0))
+        except Exception:
+            return 0
+
+    def _finn_wear_requirements(self, gs: dict) -> tuple[bool, str]:
+        worn = self._get_status_int(gs, "orange_wear_product")
+        orange_product = self._get_status_int(gs, "orange_product")
+        curiosity = self._get_status_int(gs, "curiosity")
+        stamina = self._get_status_int(gs, "stamina")
+
+        need_curiosity = 2 + worn
+        if curiosity < need_curiosity:
+            return (False, f"[SKILL] Finn wear requires curiosity >= {need_curiosity}.")
+        if orange_product < 1:
+            return (False, "[SKILL] Finn wear requires orange_product >= 1.")
+        if stamina < 1:
+            return (False, "[SKILL] Finn wear requires stamina >= 1.")
+        return (True, "")
+
+    def _apply_finn_wear_costs(self, role_id: str):
+        apply_cost_option(role_id, {"resource": "stamina", "delta": -1})
+        apply_cost_option(role_id, {"resource": "orange_product", "delta": -1})
+
+    # ----------------------
     # Game lifecycle
     # ----------------------
     def start_game(self):
@@ -271,6 +302,21 @@ class GameFlow:
         if not effect_id:
             self.logs.append("[SKILL] Invalid skill id.")
             return self.end_turn()
+
+        # Finn active skill gate (wear orange product)
+        if (
+            rid == "role_finn"
+            and effect_id == "current_player_stat_plus"
+            and str(params.get("stat", "")).strip() == "orange_wear_product"
+            and int(params.get("amount", 1)) == 1
+        ):
+            gs = load_player_gamestate(rid)
+            ok, reason = self._finn_wear_requirements(gs)
+            if not ok:
+                self.logs.append(reason)
+                return self.end_turn()
+            self._apply_finn_wear_costs(rid)
+            self.logs.append("[SKILL] Finn wear success: stamina -1, orange_product -1, orange_wear_product +1")
 
         self.logs.append(f"[SKILL] Execute: {effect_id}")
 
