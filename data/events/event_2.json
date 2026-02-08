@@ -11,11 +11,8 @@
   "role_effects": {
     "role_finn": {
       "type": "simple_effect",
-      "id": "current_player_stat_plus",
-      "params": {
-        "stat": "orange_product",
-        "amount": 1
-      }
+      "id": "finn_wear_orange_plus_curiosity",
+      "params": {}
     },
     "role_tourist": {
       "type": "interactive_action",

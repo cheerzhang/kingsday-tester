@@ -1,11 +1,11 @@
 {
   "role_id": "role_tourist",
   "status": {
-    "stamina": 4,
-    "curiosity": 3,
+    "stamina": 3,
+    "curiosity": 4,
     "money": 4,
     "product": 1,
-    "orange_product": 1,
+    "orange_product": 0,
     "orange_wear_product": 0,
     "progress": 0
   }

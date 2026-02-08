@@ -94,6 +94,43 @@ def add_status(role_id: str, key: str, delta: int):
     save_role_gamestate(role_id, gs)
 
 # ======================
+# Finn wear helpers
+# ======================
+def _get_status_int(gs: dict, key: str) -> int:
+    st = gs.get("status")
+    if not isinstance(st, dict):
+        return 0
+    try:
+        return int(st.get(key, 0))
+    except Exception:
+        return 0
+
+def check_finn_wear_requirements(gs: dict) -> tuple[bool, str]:
+    worn = _get_status_int(gs, "orange_wear_product")
+    orange_product = _get_status_int(gs, "orange_product")
+    curiosity = _get_status_int(gs, "curiosity")
+    stamina = _get_status_int(gs, "stamina")
+
+    need_curiosity = 2 + worn
+    if curiosity < need_curiosity:
+        return (False, f"[SKILL] Finn wear requires curiosity >= {need_curiosity}.")
+    if orange_product < 1:
+        return (False, "[SKILL] Finn wear requires orange_product >= 1.")
+    if stamina < 1:
+        return (False, "[SKILL] Finn wear requires stamina >= 1.")
+    return (True, "")
+
+def apply_finn_wear_costs_and_progress(actor_id: str) -> tuple[bool, str]:
+    gs = load_role_gamestate(actor_id)
+    ok, reason = check_finn_wear_requirements(gs)
+    if not ok:
+        return (False, reason)
+    add_status(actor_id, "stamina", -1)
+    add_status(actor_id, "orange_product", -1)
+    add_status(actor_id, "progress", 1)
+    return (True, "")
+
+# ======================
 # Global effect functions
 # ======================
 def all_role_stat_plus(*, params: dict, players: list[str], current_player_id=None):
@@ -930,3 +967,19 @@ def rc_try_trade(*, actor_id: str, params: dict, players=None):
 @register_rolecard_effect("vendor_price_double_all")
 def rc_vendor_price_double_all(*, actor_id: str, params: dict, players=None):
     apply_price_multiplier_global(factor=2)
+
+@register_rolecard_effect("finn_wear_orange_plus_curiosity")
+def rc_finn_wear_orange_plus_curiosity(*, actor_id: str, params: dict, players=None):
+    ok, reason = apply_finn_wear_costs_and_progress(actor_id)
+    if not ok:
+        return ("done", {"ok": False, "reason": reason}, None)
+
+    # wear orange (reuse existing stat-plus effect)
+    current_player_stat_plus(
+        params={"stat": "orange_wear_product", "amount": 1},
+        players=players or [],
+        current_player_id=actor_id,
+    )
+    # extra effect: curiosity +1
+    add_status(actor_id, "curiosity", 1)
+    return ("done", {"ok": True, "effect": "finn_wear_orange_plus_curiosity"}, None)

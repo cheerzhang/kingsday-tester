@@ -14,6 +14,7 @@ from core_logic import (
 from event_effects import (
     run_global_effect, save_current_game,
     run_rolecard_effect,
+    apply_finn_wear_costs_and_progress,
     try_take_photo_consent, try_take_photo_choose_target,
     try_trade_choose_item, try_trade_choose_partner, try_trade_consent,
 )
@@ -76,40 +77,6 @@ class GameFlow:
         self.pending_role_effect = None
         # event display defs (label_template etc.)
         self.event_defs = load_event_effect_defs()
-
-    # ----------------------
-    # Finn skill helpers
-    # ----------------------
-    def _get_status_int(self, gs: dict, key: str) -> int:
-        st = gs.get("status")
-        if not isinstance(st, dict):
-            return 0
-        try:
-            return int(st.get(key, 0))
-        except Exception:
-            return 0
-
-    def _finn_wear_requirements(self, gs: dict) -> tuple[bool, str]:
-        worn = self._get_status_int(gs, "orange_wear_product")
-        orange_product = self._get_status_int(gs, "orange_product")
-        curiosity = self._get_status_int(gs, "curiosity")
-        stamina = self._get_status_int(gs, "stamina")
-
-        need_curiosity = 2 + worn
-        if curiosity < need_curiosity:
-            return (False, f"[SKILL] Finn wear requires curiosity >= {need_curiosity}.")
-        if orange_product < 1:
-            return (False, "[SKILL] Finn wear requires orange_product >= 1.")
-        if stamina < 1:
-            return (False, "[SKILL] Finn wear requires stamina >= 1.")
-        return (True, "")
-
-    def _apply_finn_wear_costs(self, role_id: str):
-        apply_cost_option(role_id, {"resource": "stamina", "delta": -1})
-        apply_cost_option(role_id, {"resource": "orange_product", "delta": -1})
-
-    def _apply_finn_wear_progress(self, role_id: str):
-        apply_cost_option(role_id, {"resource": "progress", "delta": 1})
 
     # ----------------------
     # Game lifecycle
@@ -313,13 +280,10 @@ class GameFlow:
             and str(params.get("stat", "")).strip() == "orange_wear_product"
             and int(params.get("amount", 1)) == 1
         ):
-            gs = load_player_gamestate(rid)
-            ok, reason = self._finn_wear_requirements(gs)
+            ok, reason = apply_finn_wear_costs_and_progress(rid)
             if not ok:
                 self.logs.append(reason)
                 return self.end_turn()
-            self._apply_finn_wear_costs(rid)
-            self._apply_finn_wear_progress(rid)
             self.logs.append("[SKILL] Finn wear success: stamina -1, orange_product -1, orange_wear_product +1")
 
         self.logs.append(f"[SKILL] Execute: {effect_id}")

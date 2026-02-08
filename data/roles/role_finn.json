@@ -3,7 +3,7 @@
   "name": "Finn",
   "init_number": {
     "stamina": {
-      "number": 4,
+      "number": 5,
       "label": "体力"
     },
     "curiosity": {
