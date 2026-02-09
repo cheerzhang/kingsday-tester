@@ -231,91 +231,45 @@ class AutoPlayTab(ttk.Frame):
         """
         ui_mode = info.get("ui_mode", "")
 
-        # ---------------------------
-        # 互动：拍照
-        # ---------------------------
-        if ui_mode == "PHOTO_NEED_TARGET":
-            targets = info.get("targets", [])
-            if not targets:
-                return self.flow.end_turn()
-            target_id = random.choice(list(targets))
-            return self.flow.photo_choose_target(target_id)
-        if ui_mode == "WEAR_NEED_TARGET":
-            targets = info.get("targets", [])
-            if not targets:
-                return self.flow.end_turn()
-            target_id = random.choice(list(targets))
-            return self.flow.photo_choose_target(target_id)
+        def _pick(lst):
+            if not lst:
+                return None
+            return random.choice(list(lst))
 
-        if ui_mode == "PHOTO_NEED_CONSENT":
-            agree = random.choice([True, False])
-            return self.flow.photo_consent(agree)
-        if ui_mode == "HELP_DECISION":
-            agree = random.choice([True, False])
-            return self.flow.volunteer_help(agree)
-        if ui_mode == "FOOD_OFFER_DECIDE":
-            agree = random.choice([True, False])
-            return self.flow.food_offer_decide(info.get("target_id", ""), agree)
-        if ui_mode == "FOOD_OFFER_FORCE":
-            return self.flow.food_offer_decide(info.get("target_id", ""), True)
-        if ui_mode == "PERFORM_WATCH_DECIDE":
-            watch = random.choice([True, False])
-            return self.flow.perform_watch_decide(info.get("target_id", ""), watch)
-        if ui_mode == "PERFORM_WATCH_BENEFIT":
-            choice = random.choice(["stamina_plus_curiosity_minus", "money_minus_curiosity_plus"])
-            return self.flow.perform_watch_benefit(info.get("target_id", ""), choice)
-        if ui_mode == "GIFT_NEED_TARGET":
-            targets = info.get("targets", [])
-            if not targets:
-                return self.flow.end_turn()
-            target_id = random.choice(list(targets))
-            return self.flow.gift_choose_target(target_id)
-        if ui_mode == "EXCHANGE_NEED_TARGET":
-            targets = info.get("targets", [])
-            if not targets:
-                return self.flow.end_turn()
-            target_id = random.choice(list(targets))
-            return self.flow.exchange_choose_target(target_id)
-        if ui_mode == "EXCHANGE_NEED_CHOICE":
-            options = info.get("options", [])
-            if not options:
-                return self.flow.end_turn()
-            idx = random.randrange(len(options))
-            return self.flow.exchange_choose_option(idx)
-        if ui_mode == "EXCHANGE_NEED_CONSENT":
-            agree = random.choice([True, False])
-            return self.flow.exchange_consent(agree)
-        if ui_mode == "EVENT_NEED_TARGET":
-            targets = info.get("targets", [])
-            if not targets:
-                return self.flow.end_turn()
-            target_id = random.choice(list(targets))
-            return self.flow.event_choose_target(target_id)
-        if ui_mode == "WATCH_DECIDE":
-            target_id = info.get("target_id", "")
-            watch = random.choice([True, False])
-            return self.flow.watch_decide(target_id, watch)
+        def _pick_and(call, key):
+            target = _pick(info.get(key, []))
+            return call(target) if target else self.flow.end_turn()
 
-        # ---------------------------
-        # 互动：交易
-        # ---------------------------
-        if ui_mode == "TRADE_NEED_ITEM":
-            items = info.get("items", [])
+        def _pick_index_and(call, key):
+            items = info.get(key, [])
             if not items:
                 return self.flow.end_turn()
-            idx = random.randrange(len(items))
-            return self.flow.trade_choose_item(idx)
+            return call(random.randrange(len(items)))
 
-        if ui_mode == "TRADE_NEED_PARTNER":
-            partners = info.get("partners", [])
-            if not partners:
-                return self.flow.end_turn()
-            partner_id = random.choice(list(partners))
-            return self.flow.trade_choose_partner(partner_id)
+        actions = {
+            "PHOTO_NEED_TARGET": lambda: _pick_and(self.flow.photo_choose_target, "targets"),
+            "WEAR_NEED_TARGET": lambda: _pick_and(self.flow.photo_choose_target, "targets"),
+            "PHOTO_NEED_CONSENT": lambda: self.flow.photo_consent(random.choice([True, False])),
+            "HELP_DECISION": lambda: self.flow.volunteer_help(random.choice([True, False])),
+            "FOOD_OFFER_DECIDE": lambda: self.flow.food_offer_decide(info.get("target_id", ""), random.choice([True, False])),
+            "FOOD_OFFER_FORCE": lambda: self.flow.food_offer_decide(info.get("target_id", ""), True),
+            "PERFORM_WATCH_DECIDE": lambda: self.flow.perform_watch_decide(info.get("target_id", ""), random.choice([True, False])),
+            "PERFORM_WATCH_BENEFIT": lambda: self.flow.perform_watch_benefit(
+                info.get("target_id", ""), random.choice(["stamina_plus_curiosity_minus", "money_minus_curiosity_plus"])
+            ),
+            "GIFT_NEED_TARGET": lambda: _pick_and(self.flow.gift_choose_target, "targets"),
+            "EXCHANGE_NEED_TARGET": lambda: _pick_and(self.flow.exchange_choose_target, "targets"),
+            "EXCHANGE_NEED_CHOICE": lambda: _pick_index_and(self.flow.exchange_choose_option, "options"),
+            "EXCHANGE_NEED_CONSENT": lambda: self.flow.exchange_consent(random.choice([True, False])),
+            "EVENT_NEED_TARGET": lambda: _pick_and(self.flow.event_choose_target, "targets"),
+            "WATCH_DECIDE": lambda: self.flow.watch_decide(info.get("target_id", ""), random.choice([True, False])),
+            "TRADE_NEED_ITEM": lambda: _pick_index_and(self.flow.trade_choose_item, "items"),
+            "TRADE_NEED_PARTNER": lambda: _pick_and(self.flow.trade_choose_partner, "partners"),
+            "TRADE_NEED_CONSENT": lambda: self.flow.trade_consent(random.choice([True, False])),
+        }
 
-        if ui_mode == "TRADE_NEED_CONSENT":
-            agree = random.choice([True, False])
-            return self.flow.trade_consent(agree)
+        if ui_mode in actions:
+            return actions[ui_mode]()
 
         # ---------------------------
         # 抽卡：OR 代价选择（need_choice）
@@ -336,17 +290,6 @@ class AutoPlayTab(ttk.Frame):
                 # i
                 i = payload
                 return self.flow.choose_draw_cost(i)[1]  # ("next_turn", info)
-
-        # ---------------------------
-        # 抽卡后：个人效果是否触发（使用 / 不使用）
-        # ---------------------------
-        if info.get("post_role_effect_choice"):
-            # 两个按钮均分
-            use_it = random.choice([True, False])
-            if use_it:
-                return self.flow.trigger_role_effect()
-            else:
-                return self.flow.skip_role_effect()
 
         # ---------------------------
         # 默认：回合三选一（抽卡 / 技能 / 跳过）

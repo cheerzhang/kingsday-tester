@@ -76,6 +76,21 @@ def get_players_from_current_game():
     return players if isinstance(players, list) else []
 
 # ======================
+# Normalize helpers
+# ======================
+def _dict(v):
+    return v if isinstance(v, dict) else {}
+
+def _list(v):
+    return v if isinstance(v, list) else []
+
+def _norm_params_players(params, players):
+    return _dict(params), _list(players)
+
+def _targets_excluding(actor_id: str, players):
+    return [rid for rid in _list(players) if rid and rid != actor_id]
+
+# ======================
 # Gamestate helpers
 # ======================
 def load_role_gamestate(role_id: str) -> dict:
@@ -1873,10 +1888,8 @@ def _record_perform_result(*, actor_id: str, success: bool, watchers: list[str],
     save_role_gamestate(actor_id, gs)
 
 def perform_show_start(*, actor_id: str, players: list[str], params: dict | None = None):
-    params = params if isinstance(params, dict) else {}
-    if not isinstance(players, list):
-        players = []
-    targets = [rid for rid in players if rid and rid != actor_id]
+    params, players = _norm_params_players(params, players)
+    targets = _targets_excluding(actor_id, players)
     if not targets:
         return ("fail", {"reason": "no_targets"}, None)
 
@@ -2624,15 +2637,13 @@ def performer_auto_success_if_watchers(*, actor_id: str, players: list[str], par
     return ("done", {"ok": False, "reason": "not_enough_watchers"}, None)
 
 def performer_stage_with_forced_watcher(*, actor_id: str, players: list[str], params: dict | None = None):
-    params = params if isinstance(params, dict) else {}
+    params, players = _norm_params_players(params, players)
     target_id = get_event_selected_target(actor_id=actor_id)
     if not target_id:
         return ("done", {"ok": False, "reason": "no_target"}, None)
     gs = load_role_gamestate(actor_id)
     if _get_status_int(gs, "stamina") < 2:
         return ("done", {"ok": False, "reason": "need_stamina"}, None)
-    if not isinstance(players, list):
-        players = []
     remaining = [rid for rid in players if rid and rid != actor_id and rid != target_id]
     pending = {
         "type": "perform_show",
@@ -2664,15 +2675,13 @@ def performer_stage_with_forced_watcher_no_stamina_cost(
     players: list[str],
     params: dict | None = None,
 ):
-    params = params if isinstance(params, dict) else {}
+    params, players = _norm_params_players(params, players)
     target_id = get_event_selected_target(actor_id=actor_id)
     if not target_id:
         return ("done", {"ok": False, "reason": "no_target"}, None)
     gs = load_role_gamestate(actor_id)
     if _get_status_int(gs, "stamina") < 2:
         return ("done", {"ok": False, "reason": "need_stamina"}, None)
-    if not isinstance(players, list):
-        players = []
     remaining = [rid for rid in players if rid and rid != actor_id and rid != target_id]
     pending = {
         "type": "perform_show",
@@ -2700,10 +2709,8 @@ def performer_stage_with_forced_watcher_no_stamina_cost(
     return ("need_perform_decision", {"target_id": next_id, "logs": pending.get("logs", [])}, pending)
 
 def performer_show_no_stamina_cost(*, actor_id: str, players: list[str], params: dict | None = None):
-    params = params if isinstance(params, dict) else {}
-    if not isinstance(players, list):
-        players = []
-    targets = [rid for rid in players if rid and rid != actor_id]
+    params, players = _norm_params_players(params, players)
+    targets = _targets_excluding(actor_id, players)
     if not targets:
         return ("fail", {"reason": "no_targets"}, None)
 
@@ -2733,10 +2740,10 @@ def performer_show_no_stamina_cost(*, actor_id: str, players: list[str], params:
     return ("need_perform_decision", {"target_id": target_id}, pending)
 
 def performer_show_required1_if_unworn_orange(*, actor_id: str, players: list[str], params: dict | None = None):
-    params = params if isinstance(params, dict) else {}
+    params, players = _norm_params_players(params, players)
     actor_gs = load_role_gamestate(actor_id)
     orange_unworn = _get_status_int(actor_gs, "orange_product")
-    kind, payload, pending = perform_show_start(actor_id=actor_id, players=players or [], params=params)
+    kind, payload, pending = perform_show_start(actor_id=actor_id, players=players, params=params)
     if orange_unworn >= 1 and isinstance(pending, dict):
         pending["required_success"] = 1
         pending.setdefault("logs", []).append("[PERFORM] Unworn orange -> require 1 watcher.")
@@ -2748,7 +2755,7 @@ def performer_show_force_selected_watcher_no_stamina_cost_if_target_has_both_ora
     players: list[str],
     params: dict | None = None,
 ):
-    params = params if isinstance(params, dict) else {}
+    params, players = _norm_params_players(params, players)
     target_id = get_event_selected_target(actor_id=actor_id)
     if not target_id:
         return ("done", {"ok": False, "reason": "no_target"}, None)
@@ -2757,9 +2764,7 @@ def performer_show_force_selected_watcher_no_stamina_cost_if_target_has_both_ora
         return ("done", {"ok": False, "reason": "target_not_both_orange"}, None)
 
     # start performance with forced watcher and no stamina cost
-    if not isinstance(players, list):
-        players = []
-    targets = [rid for rid in players if rid and rid != actor_id]
+    targets = _targets_excluding(actor_id, players)
     if not targets:
         return ("fail", {"reason": "no_targets"}, None)
 
@@ -2800,10 +2805,8 @@ def performer_show_force_selected_watcher_no_stamina_cost_if_target_has_both_ora
     return ("need_perform_decision", {"target_id": next_id, "logs": pending.get("logs", [])}, pending)
 
 def performer_show_force_watch_low_stamina(*, actor_id: str, players: list[str], params: dict | None = None):
-    params = params if isinstance(params, dict) else {}
-    if not isinstance(players, list):
-        players = []
-    targets = [rid for rid in players if rid and rid != actor_id]
+    params, players = _norm_params_players(params, players)
+    targets = _targets_excluding(actor_id, players)
     if not targets:
         return ("fail", {"reason": "no_targets"}, None)
 
@@ -2841,10 +2844,8 @@ def performer_show_force_watch_low_stamina(*, actor_id: str, players: list[str],
     return ("need_perform_decision", {"target_id": target_id}, pending)
 
 def performer_show_force_watch_lowest_stamina(*, actor_id: str, players: list[str], params: dict | None = None):
-    params = params if isinstance(params, dict) else {}
-    if not isinstance(players, list):
-        players = []
-    targets = [rid for rid in players if rid and rid != actor_id]
+    params, players = _norm_params_players(params, players)
+    targets = _targets_excluding(actor_id, players)
     if not targets:
         return ("fail", {"reason": "no_targets"}, None)
 
@@ -2887,10 +2888,10 @@ def performer_auto_success_if_stamina(*, actor_id: str, players: list[str], para
     return ("done", {"ok": False, "reason": "need_stamina"}, None)
 
 def performer_show_auto_success_if_wearing(*, actor_id: str, players: list[str], params: dict | None = None):
-    params = params if isinstance(params, dict) else {}
+    params, players = _norm_params_players(params, players)
     actor_gs = load_role_gamestate(actor_id)
     orange_wear = _get_status_int(actor_gs, "orange_wear_product")
-    kind, payload, pending = perform_show_start(actor_id=actor_id, players=players or [], params=params)
+    kind, payload, pending = perform_show_start(actor_id=actor_id, players=players, params=params)
     if orange_wear >= 1 and isinstance(pending, dict):
         # force success regardless of watcher results
         pending["required_success"] = 0
@@ -2898,10 +2899,10 @@ def performer_show_auto_success_if_wearing(*, actor_id: str, players: list[str],
     return (kind, payload, pending)
 
 def performer_wear_or_perform_required1(*, actor_id: str, players: list[str], params: dict | None = None):
-    params = params if isinstance(params, dict) else {}
+    params, players = _norm_params_players(params, players)
     gs = load_role_gamestate(actor_id)
     if _get_status_int(gs, "orange_wear_product") >= 1:
-        kind, payload, pending = perform_show_start(actor_id=actor_id, players=players or [], params=params)
+        kind, payload, pending = perform_show_start(actor_id=actor_id, players=players, params=params)
         if isinstance(pending, dict):
             pending["required_success"] = 1
             pending.setdefault("logs", []).append("[PERFORM] Wearing orange -> require 1 watcher.")
@@ -2918,7 +2919,7 @@ def performer_auto_success_if_lowest_curiosity_ge2_else_perform(
     players: list[str],
     params: dict | None = None,
 ):
-    params = params if isinstance(params, dict) else {}
+    params, players = _norm_params_players(params, players)
     g = load_current_game()
     lec = g.get("last_event_context")
     ids = []
@@ -2928,7 +2929,7 @@ def performer_auto_success_if_lowest_curiosity_ge2_else_perform(
         add_status(actor_id, "progress", 1)
         _add_counter(actor_id, "perform", 1)
         return ("done", {"ok": True, "effect": "performer_auto_success_if_lowest_curiosity_ge2"}, None)
-    return perform_show_start(actor_id=actor_id, players=players or [], params=params)
+    return perform_show_start(actor_id=actor_id, players=players, params=params)
 
 def tourist_photo_auto_if_performer_wear(*, actor_id: str, players: list[str], params: dict | None = None):
     params = params if isinstance(params, dict) else {}

@@ -311,55 +311,28 @@ class SetupTab(ttk.Frame):
         #    - 抽卡后个人效果选择：显示 使用/不使用
         #    - 否则：回合三选一：抽卡 / 发动技能 / 跳过
         # =========================================================
-        # 2.1 互动流程：交易
-        if ui_mode == "TRADE_NEED_ITEM":
-            self.show_trade_items(info.get("items", []))
+        handlers = {
+            "TRADE_NEED_ITEM": lambda: self.show_trade_items(info.get("items", [])),
+            "TRADE_NEED_PARTNER": lambda: self.show_trade_partners(info.get("partners", [])),
+            "TRADE_NEED_CONSENT": lambda: self.show_trade_consent(info.get("partner_id", "")),
+            "PHOTO_NEED_TARGET": lambda: self.show_photo_targets(info.get("targets", [])),
+            "WEAR_NEED_TARGET": lambda: self.show_wear_targets(info.get("targets", [])),
+            "PHOTO_NEED_CONSENT": lambda: self.show_photo_consent(info.get("target_id", "")),
+            "FOOD_OFFER_DECIDE": lambda: self.show_food_offer_decide(info.get("target_id", ""), info.get("price", 0)),
+            "FOOD_OFFER_FORCE": lambda: self.show_food_offer_force(info.get("target_id", ""), info.get("price", 0)),
+            "PERFORM_WATCH_DECIDE": lambda: self.show_perform_watch_decide(info.get("target_id", "")),
+            "PERFORM_WATCH_BENEFIT": lambda: self.show_perform_watch_benefit(info.get("target_id", "")),
+            "GIFT_NEED_TARGET": lambda: self.show_gift_targets(info.get("targets", [])),
+            "EXCHANGE_NEED_TARGET": lambda: self.show_exchange_targets(info.get("targets", [])),
+            "EXCHANGE_NEED_CHOICE": lambda: self.show_exchange_choices(info.get("options", [])),
+            "EXCHANGE_NEED_CONSENT": lambda: self.show_exchange_consent(info.get("target_id", "")),
+            "EVENT_NEED_TARGET": lambda: self.show_event_targets(info.get("targets", [])),
+            "WATCH_DECIDE": lambda: self.show_watch_decide(info.get("target_id", "")),
+            "HELP_DECISION": lambda: self.show_help_decision(info.get("help_action", "")),
+        }
 
-        elif ui_mode == "TRADE_NEED_PARTNER":
-            self.show_trade_partners(info.get("partners", []))
-
-        elif ui_mode == "TRADE_NEED_CONSENT":
-            self.show_trade_consent(info.get("partner_id", ""))
-        # 2.2 互动流程：拍照
-        elif ui_mode == "PHOTO_NEED_TARGET":
-            self.show_photo_targets(info.get("targets", []))
-        elif ui_mode == "WEAR_NEED_TARGET":
-            self.show_wear_targets(info.get("targets", []))
-
-        elif ui_mode == "PHOTO_NEED_CONSENT":
-            self.show_photo_consent(info.get("target_id", ""))
-        elif ui_mode == "FOOD_OFFER_DECIDE":
-            self.show_food_offer_decide(info.get("target_id", ""), info.get("price", 0))
-        elif ui_mode == "FOOD_OFFER_FORCE":
-            self.show_food_offer_force(info.get("target_id", ""), info.get("price", 0))
-        elif ui_mode == "PERFORM_WATCH_DECIDE":
-            self.show_perform_watch_decide(info.get("target_id", ""))
-        elif ui_mode == "PERFORM_WATCH_BENEFIT":
-            self.show_perform_watch_benefit(info.get("target_id", ""))
-        elif ui_mode == "GIFT_NEED_TARGET":
-            self.show_gift_targets(info.get("targets", []))
-        elif ui_mode == "EXCHANGE_NEED_TARGET":
-            self.show_exchange_targets(info.get("targets", []))
-        elif ui_mode == "EXCHANGE_NEED_CHOICE":
-            self.show_exchange_choices(info.get("options", []))
-        elif ui_mode == "EXCHANGE_NEED_CONSENT":
-            self.show_exchange_consent(info.get("target_id", ""))
-        elif ui_mode == "EVENT_NEED_TARGET":
-            self.show_event_targets(info.get("targets", []))
-        elif ui_mode == "WATCH_DECIDE":
-            self.show_watch_decide(info.get("target_id", ""))
-        elif ui_mode == "HELP_DECISION":
-            self.show_help_decision(info.get("help_action", ""))
-        # 2.3 抽卡后：个人效果选择（使用 / 不使用）
-        elif info.get("post_role_effect_choice"):
-            self.role_use_mode = "CARD_EFFECT"
-            can_trigger = bool(info.get("can_trigger", False))
-            self.btn_role_use.configure(state=("normal" if can_trigger else "disabled"))
-            self.btn_role_use.configure(text="使用个人效果 (-1体力)")
-            self.btn_role_use.pack(side="left", padx=6)
-            self.btn_role_skip.configure(text="不使用", state="normal")
-            self.btn_role_skip.pack(side="left", padx=6)
-        # 2.5 默认：回合三选一（抽卡 / 发动技能 / 跳过）
+        if ui_mode in handlers:
+            handlers[ui_mode]()
         else:
             self.role_use_mode = "ACTIVE_SKILL"
             can_draw = bool(info.get("can_draw", False))
