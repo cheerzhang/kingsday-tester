@@ -45,5 +45,6 @@
   "victory": {
     "id": "volunteer_help_n_types",
     "params": { "n": 3 }
-  }
+  },
+  "active_skill_desc": "无主动技能（通过帮助他人触发进度）"
 }

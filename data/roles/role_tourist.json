@@ -50,5 +50,6 @@
     "type": "interactive",
     "id": "try_take_photo",
     "params": { }
-  }
+  },
+  "active_skill_desc": "主动：发起拍照（需满足门槛，目标可拒绝）"
 }

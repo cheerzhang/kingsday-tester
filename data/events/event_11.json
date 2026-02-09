@@ -35,6 +35,12 @@
       "id": "offer_food",
       "params": { "bonus_stamina": 1, "finn_free": true, "min_eaters": 2 },
       "label": "发起供餐：体力收益 +2；Finn 免费；成功需≥2人购买"
+    },
+    "role_performer": {
+      "type": "interactive_action",
+      "id": "performer_show_force_watch_low_stamina",
+      "params": {},
+      "label": "发起表演；体力 ≤3 的玩家必须围观"
     }
   }
 }

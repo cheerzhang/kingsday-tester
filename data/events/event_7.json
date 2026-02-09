@@ -30,6 +30,12 @@
       "id": "food_offer_event_target",
       "params": {},
       "label": "对选中的玩家发起供餐（不可拒绝，成功则进度+1）"
+    },
+    "role_performer": {
+      "type": "interactive_action",
+      "id": "performer_show_force_selected_watcher_no_stamina_cost_if_target_has_both_orange",
+      "params": {},
+      "label": "若目标同时拥有已佩戴与未佩戴橙色物品，则发起表演（目标强制围观、无体力消耗）"
     }
   }
 }

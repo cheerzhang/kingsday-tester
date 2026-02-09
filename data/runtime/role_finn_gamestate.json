@@ -1,8 +1,8 @@
 {
   "role_id": "role_finn",
   "status": {
-    "stamina": 3,
-    "curiosity": 2,
+    "stamina": 4,
+    "curiosity": 1,
     "money": 0,
     "product": 0,
     "orange_product": 0,

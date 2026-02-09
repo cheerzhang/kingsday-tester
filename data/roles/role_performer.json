@@ -47,6 +47,7 @@
     "id": "perform_show",
     "params": {}
   },
+  "active_skill_desc": "主动：发起表演（围观者选择收益）",
   "victory": {
     "id": "perform_n_times",
     "params": { "n": 3 }

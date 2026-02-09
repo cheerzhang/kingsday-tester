@@ -33,6 +33,17 @@
       "id": "food_vendor_product_for_stamina",
       "params": {},
       "label": "消耗 1 件普通物品，体力 +1"
+    },
+    "role_performer": {
+      "type": "simple_effect",
+      "id": "current_player_stat_plus_and_minus",
+      "params": {
+        "stat_plus": "orange_product",
+        "amount_plus": 1,
+        "stat_minus": "product",
+        "amount_minus": -1
+      },
+      "label": "消耗 1 件普通物品，获得 1 件橙色物品"
     }
   }
 }

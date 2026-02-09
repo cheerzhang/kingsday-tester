@@ -52,5 +52,6 @@
     "type": "simple",
     "id": "current_player_stat_plus",
     "params": { "stat": "orange_wear_product", "amount": 1 }
-  }
+  },
+  "active_skill_desc": "主动：穿上 1 件橙色物品"
 }

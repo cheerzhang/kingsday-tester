@@ -45,6 +45,12 @@
       "id": "food_vendor_offer_no_cost",
       "params": {},
       "label": "发起一次供餐（本次不扣体力）"
+    },
+    "role_performer": {
+      "type": "interactive_action",
+      "id": "performer_show_required1_if_unworn_orange",
+      "params": {},
+      "label": "发起表演；若有未佩戴橙色物品则只需 1 人围观成功"
     }
   }
 }

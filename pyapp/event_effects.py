@@ -1916,6 +1916,10 @@ def perform_show_decide(*, pending: dict, target_id: str, watch: bool):
     if current != target_id:
         return ("fail", {"reason": "bad_target"}, None)
 
+    forced = pending.get("forced_watchers")
+    if isinstance(forced, list) and target_id in forced:
+        watch = True
+
     if not watch:
         pending.setdefault("logs", []).append(f"[PERFORM] {target_id} declined.")
         # continue or finish
@@ -2695,6 +2699,185 @@ def performer_stage_with_forced_watcher_no_stamina_cost(
     next_id = remaining[0]
     return ("need_perform_decision", {"target_id": next_id, "logs": pending.get("logs", [])}, pending)
 
+def performer_show_no_stamina_cost(*, actor_id: str, players: list[str], params: dict | None = None):
+    params = params if isinstance(params, dict) else {}
+    if not isinstance(players, list):
+        players = []
+    targets = [rid for rid in players if rid and rid != actor_id]
+    if not targets:
+        return ("fail", {"reason": "no_targets"}, None)
+
+    actor_gs = load_role_gamestate(actor_id)
+    stamina = _get_status_int(actor_gs, "stamina")
+    pending = {
+        "type": "perform_show",
+        "stage": "decide",
+        "actor_id": actor_id,
+        "remaining": targets,
+        "success_count": 0,
+        "watchers": [],
+        "params": params,
+        "logs": [],
+        "skip_stamina_cost": True,
+    }
+
+    if stamina < 2:
+        return ("need_help", {
+            "action_type": "perform_start",
+            "actor_id": actor_id,
+            "reason": "need_stamina",
+            "pending": pending,
+        }, None)
+
+    target_id = targets[0]
+    return ("need_perform_decision", {"target_id": target_id}, pending)
+
+def performer_show_required1_if_unworn_orange(*, actor_id: str, players: list[str], params: dict | None = None):
+    params = params if isinstance(params, dict) else {}
+    actor_gs = load_role_gamestate(actor_id)
+    orange_unworn = _get_status_int(actor_gs, "orange_product")
+    kind, payload, pending = perform_show_start(actor_id=actor_id, players=players or [], params=params)
+    if orange_unworn >= 1 and isinstance(pending, dict):
+        pending["required_success"] = 1
+        pending.setdefault("logs", []).append("[PERFORM] Unworn orange -> require 1 watcher.")
+    return (kind, payload, pending)
+
+def performer_show_force_selected_watcher_no_stamina_cost_if_target_has_both_orange(
+    *,
+    actor_id: str,
+    players: list[str],
+    params: dict | None = None,
+):
+    params = params if isinstance(params, dict) else {}
+    target_id = get_event_selected_target(actor_id=actor_id)
+    if not target_id:
+        return ("done", {"ok": False, "reason": "no_target"}, None)
+    tgs = load_role_gamestate(target_id)
+    if _get_status_int(tgs, "orange_product") < 1 or _get_status_int(tgs, "orange_wear_product") < 1:
+        return ("done", {"ok": False, "reason": "target_not_both_orange"}, None)
+
+    # start performance with forced watcher and no stamina cost
+    if not isinstance(players, list):
+        players = []
+    targets = [rid for rid in players if rid and rid != actor_id]
+    if not targets:
+        return ("fail", {"reason": "no_targets"}, None)
+
+    actor_gs = load_role_gamestate(actor_id)
+    stamina = _get_status_int(actor_gs, "stamina")
+    pending = {
+        "type": "perform_show",
+        "stage": "decide",
+        "actor_id": actor_id,
+        "remaining": [rid for rid in targets if rid != target_id],
+        "success_count": 1,
+        "watchers": [target_id],
+        "params": params,
+        "logs": [f"[PERFORM] {target_id} forced to watch (no cost)."],
+        "required_success": 2,
+        "skip_stamina_cost": True,
+    }
+
+    if stamina < 2:
+        return ("need_help", {
+            "action_type": "perform_start",
+            "actor_id": actor_id,
+            "reason": "need_stamina",
+            "pending": pending,
+        }, None)
+
+    if not pending["remaining"]:
+        ok = pending.get("success_count", 0) >= int(pending.get("required_success", 2) or 2)
+        _record_perform_result(
+            actor_id=actor_id,
+            success=ok,
+            watchers=pending.get("watchers", []),
+            skip_stamina_cost=True,
+        )
+        return ("done", {"ok": ok, "logs": pending.get("logs", [])}, None)
+
+    next_id = pending["remaining"][0]
+    return ("need_perform_decision", {"target_id": next_id, "logs": pending.get("logs", [])}, pending)
+
+def performer_show_force_watch_low_stamina(*, actor_id: str, players: list[str], params: dict | None = None):
+    params = params if isinstance(params, dict) else {}
+    if not isinstance(players, list):
+        players = []
+    targets = [rid for rid in players if rid and rid != actor_id]
+    if not targets:
+        return ("fail", {"reason": "no_targets"}, None)
+
+    actor_gs = load_role_gamestate(actor_id)
+    stamina = _get_status_int(actor_gs, "stamina")
+    pending = {
+        "type": "perform_show",
+        "stage": "decide",
+        "actor_id": actor_id,
+        "remaining": targets,
+        "success_count": 0,
+        "watchers": [],
+        "params": params,
+        "logs": [],
+    }
+
+    forced = []
+    for rid in targets:
+        gs = load_role_gamestate(rid)
+        if _get_status_int(gs, "stamina") <= 3:
+            forced.append(rid)
+    if forced:
+        pending["forced_watchers"] = forced
+        pending.setdefault("logs", []).append("[PERFORM] Low-stamina watchers must watch.")
+
+    if stamina < 2:
+        return ("need_help", {
+            "action_type": "perform_start",
+            "actor_id": actor_id,
+            "reason": "need_stamina",
+            "pending": pending,
+        }, None)
+
+    target_id = targets[0]
+    return ("need_perform_decision", {"target_id": target_id}, pending)
+
+def performer_show_force_watch_lowest_stamina(*, actor_id: str, players: list[str], params: dict | None = None):
+    params = params if isinstance(params, dict) else {}
+    if not isinstance(players, list):
+        players = []
+    targets = [rid for rid in players if rid and rid != actor_id]
+    if not targets:
+        return ("fail", {"reason": "no_targets"}, None)
+
+    actor_gs = load_role_gamestate(actor_id)
+    stamina = _get_status_int(actor_gs, "stamina")
+    pending = {
+        "type": "perform_show",
+        "stage": "decide",
+        "actor_id": actor_id,
+        "remaining": targets,
+        "success_count": 0,
+        "watchers": [],
+        "params": params,
+        "logs": [],
+    }
+
+    forced = list_lowest_stamina_players(actor_id=actor_id, players=players)
+    forced = [rid for rid in forced if rid and rid in targets]
+    if forced:
+        pending["forced_watchers"] = forced
+        pending.setdefault("logs", []).append("[PERFORM] Lowest-stamina watchers must watch.")
+
+    if stamina < 2:
+        return ("need_help", {
+            "action_type": "perform_start",
+            "actor_id": actor_id,
+            "reason": "need_stamina",
+            "pending": pending,
+        }, None)
+
+    target_id = targets[0]
+    return ("need_perform_decision", {"target_id": target_id}, pending)
+
 def performer_auto_success_if_stamina(*, actor_id: str, players: list[str], params: dict | None = None):
     gs = load_role_gamestate(actor_id)
     if _get_status_int(gs, "stamina") >= 2:
@@ -2962,6 +3145,24 @@ def food_vendor_swap_event_target_start(*, actor_id: str, players: list[str], pa
         on_refuse={"type": "money"},
     )
 
+def performer_swap_event_target_plus_stamina(*, actor_id: str, players: list[str], params: dict | None = None):
+    params = params if isinstance(params, dict) else {}
+    # gain stamina regardless of swap success
+    add_status(actor_id, "stamina", 2)
+    target_id = get_event_selected_target(actor_id=actor_id)
+    if not target_id:
+        return ("done", {"ok": False, "reason": "no_target"}, None)
+    actor_opts = _get_exchange_item_options(role_id=actor_id, allow_wear=True, only_product=False)
+    target_opts = _get_exchange_item_options(role_id=target_id, allow_wear=True, only_product=False)
+    return swap_items_start(
+        actor_id=actor_id,
+        target_id=target_id,
+        actor_opts=actor_opts,
+        target_opts=target_opts,
+        force_agree=False,
+        on_refuse=None,
+    )
+
 def try_trade_consent(
     *,
     pending: dict,
@@ -3112,34 +3313,6 @@ def compute_trade_price(*, seller_gs: dict, item_key: str) -> int:
             if bonus > 1:
                 price = price * bonus
     return max(1, price)
-
-# =========================
-# Vendor price helpers
-# =========================
-
-def apply_price_multiplier_all_players(*, players: list[str], factor: int):
-    if not isinstance(players, list):
-        return
-    try:
-        factor = int(factor)
-    except Exception:
-        factor = 1
-    if factor <= 1:
-        return
-    for rid in players:
-        if not rid:
-            continue
-        gs = load_role_gamestate(rid)
-        trade_state = gs.get("trade_state")
-        if not isinstance(trade_state, dict):
-            trade_state = {}
-            gs["trade_state"] = trade_state
-        try:
-            mod = int(trade_state.get("price_mod", 1))
-        except Exception:
-            mod = 1
-        trade_state["price_mod"] = max(1, mod * factor)
-        save_role_gamestate(rid, gs)
 
 def apply_price_multiplier_global(*, factor: int):
     g = load_current_game()
@@ -3521,6 +3694,11 @@ def rc_food_vendor_swap_event_target(*, actor_id: str, params: dict, players=Non
     players = players if isinstance(players, list) else []
     return food_vendor_swap_event_target_start(actor_id=actor_id, players=players, params=params)
 
+@register_rolecard_effect("performer_swap_event_target_plus_stamina")
+def rc_performer_swap_event_target_plus_stamina(*, actor_id: str, params: dict, players=None):
+    players = players if isinstance(players, list) else []
+    return performer_swap_event_target_plus_stamina(actor_id=actor_id, players=players, params=params)
+
 @register_rolecard_effect("tourist_photo_lowest_stamina")
 def rc_tourist_photo_lowest_stamina(*, actor_id: str, params: dict, players=None):
     players = players if isinstance(players, list) else []
@@ -3628,6 +3806,35 @@ def rc_performer_stage_with_forced_watcher(*, actor_id: str, params: dict, playe
 def rc_performer_stage_with_forced_watcher_no_stamina_cost(*, actor_id: str, params: dict, players=None):
     players = players if isinstance(players, list) else []
     return performer_stage_with_forced_watcher_no_stamina_cost(
+        actor_id=actor_id,
+        players=players,
+        params=params,
+    )
+
+@register_rolecard_effect("performer_show_force_watch_low_stamina")
+def rc_performer_show_force_watch_low_stamina(*, actor_id: str, params: dict, players=None):
+    players = players if isinstance(players, list) else []
+    return performer_show_force_watch_low_stamina(actor_id=actor_id, players=players, params=params)
+
+@register_rolecard_effect("performer_show_force_watch_lowest_stamina")
+def rc_performer_show_force_watch_lowest_stamina(*, actor_id: str, params: dict, players=None):
+    players = players if isinstance(players, list) else []
+    return performer_show_force_watch_lowest_stamina(actor_id=actor_id, players=players, params=params)
+
+@register_rolecard_effect("performer_show_no_stamina_cost")
+def rc_performer_show_no_stamina_cost(*, actor_id: str, params: dict, players=None):
+    players = players if isinstance(players, list) else []
+    return performer_show_no_stamina_cost(actor_id=actor_id, players=players, params=params)
+
+@register_rolecard_effect("performer_show_required1_if_unworn_orange")
+def rc_performer_show_required1_if_unworn_orange(*, actor_id: str, params: dict, players=None):
+    players = players if isinstance(players, list) else []
+    return performer_show_required1_if_unworn_orange(actor_id=actor_id, players=players, params=params)
+
+@register_rolecard_effect("performer_show_force_selected_watcher_no_stamina_cost_if_target_has_both_orange")
+def rc_performer_show_force_selected_watcher_no_stamina_cost_if_target_has_both_orange(*, actor_id: str, params: dict, players=None):
+    players = players if isinstance(players, list) else []
+    return performer_show_force_selected_watcher_no_stamina_cost_if_target_has_both_orange(
         actor_id=actor_id,
         players=players,
         params=params,

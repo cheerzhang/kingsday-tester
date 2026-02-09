@@ -30,6 +30,12 @@
       "id": "food_vendor_swap_event_target",
       "params": {},
       "label": "用普通/橙色物品交换对方普通/橙色物品；若拒绝则获得1金钱"
+    },
+    "role_performer": {
+      "type": "interactive_action",
+      "id": "performer_swap_event_target_plus_stamina",
+      "params": {},
+      "label": "与对方交换物品（无论成功与否体力 +2）"
     }
   }
 }

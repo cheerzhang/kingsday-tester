@@ -608,24 +608,12 @@ class GameFlow:
         else:
             reff = None
         if isinstance(reff, dict):
-            gs = load_player_gamestate(current_player_id)
-            st = gs.get("status", {})
-            stamina = int(st.get("stamina", 0)) if isinstance(st, dict) else 0
-            can_trigger = stamina >= 1
             self.pending_role_effect = {
                 "actor_id": current_player_id,
                 "role_effect": reff,
             }
-            self.logs.append("[ROLE_EFFECT] Trigger (-1 stamina) or skip?")
-            role = load_role_by_id(current_player_id)
-            return {
-                "role_id": current_player_id,
-                "role_name": role.get("name", current_player_id),
-                "post_role_effect_choice": True,
-                "can_trigger": can_trigger,
-                "role_effect_type": str(reff.get("type", "")).strip(),
-                "role_effect_id": str(reff.get("id", "")).strip(),
-            }
+            self.logs.append("[ROLE_EFFECT] Auto trigger (no cost).")
+            return self.trigger_role_effect()
         return self.end_turn()
 
     def event_choose_target(self, target_id: str):
@@ -870,11 +858,7 @@ class GameFlow:
             self.logs.append("[ROLE_EFFECT] Invalid role effect data.")
             return self.end_turn()
 
-        # 1️⃣ 扣 1 体力
-        apply_cost_option(actor_id, {"resource": "stamina", "delta": -1})
-        self.logs.append("[ROLE_EFFECT] Paid: stamina -1")
-
-        # 2️⃣ 调用配置里的 function
+        # 1️⃣ 调用配置里的 function
         effect_id = str(role_eff.get("id", "")).strip()
         params = role_eff.get("params", {})
         if not isinstance(params, dict):
@@ -893,7 +877,7 @@ class GameFlow:
             self.logs.append(f"[ROLE_EFFECT] Execute failed: {e}")
             return self.end_turn()
 
-        # 3️⃣ 处理返回值（互动/非互动）
+        # 2️⃣ 处理返回值（互动/非互动）
         # 约定：互动函数返回 (kind, payload, pending)
         if isinstance(result, tuple) and len(result) == 3:
             kind, payload, pending = result

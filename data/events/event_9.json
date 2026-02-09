@@ -24,7 +24,6 @@
       "params": {},
       "label": "若有橙色物品则穿上，并好奇心 +1"
     },
-    "role_vendor": null,
     "role_vendor": {
       "type": "simple_effect",
       "id": "current_player_stat_plus",
@@ -42,6 +41,12 @@
         "amount": 1
       },
       "label": "获得 1 件橙色物品"
+    },
+    "role_performer": {
+      "type": "interactive_action",
+      "id": "performer_show_no_stamina_cost",
+      "params": {},
+      "label": "发起表演（无论成功与否都不消耗体力）"
     }
   }
 }

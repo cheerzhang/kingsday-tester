@@ -53,5 +53,6 @@
     "type": "interactive",
     "id": "try_trade",
     "params": { }
-  }
+  },
+  "active_skill_desc": "主动：发起交易（需满足门槛，目标可拒绝）"
 }

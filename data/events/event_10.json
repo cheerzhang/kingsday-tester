@@ -30,6 +30,12 @@
       "id": "vendor_trade_lowest_stamina",
       "params": {},
       "label": "对体力最低的玩家发起交易（不可拒绝）；成功后获得 1 件普通物品"
+    },
+    "role_performer": {
+      "type": "interactive_action",
+      "id": "performer_show_force_watch_lowest_stamina",
+      "params": {},
+      "label": "发起表演；体力最低的玩家必须围观（并列都需围观）"
     }
   }
 }

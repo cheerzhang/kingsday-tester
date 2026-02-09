@@ -47,5 +47,6 @@
     "type": "interactive",
     "id": "offer_food",
     "params": {}
-  }
+  },
+  "active_skill_desc": "主动：发起供餐（玩家可选择购买）"
 }
