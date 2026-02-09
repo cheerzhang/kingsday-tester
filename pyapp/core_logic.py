@@ -186,7 +186,7 @@ def get_draw_cost_config(role_obj: dict) -> tuple[str, list[dict]]:
 # ==========================================================
 
 
-def update_winrate(players: list[str], winners: list[str]):
+def update_winrate(players: list[str], winners: list[str], draws: int | None = None, rounds: int | None = None):
     key = "|".join(sorted(players))
 
     data = _load_json(WINRATE_PATH, {"total_games": 0, "by_player_set": {}})
@@ -194,11 +194,32 @@ def update_winrate(players: list[str], winners: list[str]):
 
     rec = data["by_player_set"].setdefault(key, {
         "games": 0,
-        "wins": {}
+        "wins": {},
+        "draws_total": 0,
+        "rounds_total": 0,
+        "avg_draws": 0.0,
+        "avg_rounds": 0.0,
     })
 
     rec["games"] += 1
     for w in winners:
         rec["wins"][w] = rec["wins"].get(w, 0) + 1
+
+    if draws is not None:
+        try:
+            rec["draws_total"] += int(draws)
+        except Exception:
+            pass
+    if rounds is not None:
+        try:
+            rec["rounds_total"] += int(rounds)
+        except Exception:
+            pass
+
+    try:
+        rec["avg_draws"] = round(rec["draws_total"] / max(1, rec["games"]), 2)
+        rec["avg_rounds"] = round(rec["rounds_total"] / max(1, rec["games"]), 2)
+    except Exception:
+        pass
 
     save_json(WINRATE_PATH, data)

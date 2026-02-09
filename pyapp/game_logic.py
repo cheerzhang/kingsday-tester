@@ -147,6 +147,7 @@ def init_game_runtime(selected_role_ids: list[str]) -> list[str]:
         "game_over": False,
         "game_over_reason": "",
         "events_drawn": [],
+        "rounds_completed": 0,
         "global_trade_state": {
             "price_mod": int(defaults.get("price_mod", 1))
         }
@@ -162,7 +163,7 @@ def load_current_game():
     _ensure_dirs()
     return _load_json(
         CURRENT_GAME_PATH,
-        {"players": [], "game_over": False, "game_over_reason": ""}
+        {"players": [], "game_over": False, "game_over_reason": "", "rounds_completed": 0}
     )
 
 def is_game_over() -> bool:

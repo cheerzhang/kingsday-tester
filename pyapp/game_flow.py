@@ -116,7 +116,11 @@ class GameFlow:
                 names.append(role.get("name", rid))
             self.logs.append("\n=== GAME OVER ===")
             self.logs.append("Winner(s): " + ", ".join(names))
-        update_winrate(self.players, winners)
+        cur = load_current_game()
+        drawn = cur.get("events_drawn", [])
+        draws = len(drawn) if isinstance(drawn, list) else 0
+        rounds = int(cur.get("rounds_completed", 0)) if isinstance(cur, dict) else 0
+        update_winrate(self.players, winners, draws=draws, rounds=rounds)
         return {
             "game_over": True,
             "winners": winners,
@@ -151,6 +155,13 @@ class GameFlow:
         self.turn_index += 1
         if self.turn_index >= len(self.players):
             self.turn_index = 0
+            try:
+                cur = load_current_game()
+                if isinstance(cur, dict):
+                    cur["rounds_completed"] = int(cur.get("rounds_completed", 0)) + 1
+                    save_current_game(cur)
+            except Exception:
+                pass
         return self.start_turn()
 
     # ----------------------

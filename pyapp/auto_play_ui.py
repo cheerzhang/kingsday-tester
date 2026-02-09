@@ -9,10 +9,12 @@ from game_logic import (
     init_game_runtime,
     load_all_roles_min,
     load_current_game,
+    load_player_gamestate,
     is_game_over,
     reset_runtime,
 )
 from game_flow import GameFlow
+from event_effects import compute_trade_price
 
 
 class AutoPlayTab(ttk.Frame):
@@ -226,46 +228,241 @@ class AutoPlayTab(ttk.Frame):
 
     def _choose_and_apply(self, info: dict) -> dict:
         """
-        把“UI 按钮选择”改成随机选择（均匀概率）。
-        只调用现有 flow 方法，不重写规则。
+        自利逻辑：
+        - 自己优先赢、尽量不帮助别人
+        - 不使用概率随机
         """
         ui_mode = info.get("ui_mode", "")
 
-        def _pick(lst):
-            if not lst:
+        def _status(role_id: str) -> dict:
+            gs = load_player_gamestate(role_id)
+            st = gs.get("status")
+            return st if isinstance(st, dict) else {}
+
+        def _ival(d: dict, key: str) -> int:
+            try:
+                return int(d.get(key, 0))
+            except Exception:
+                return 0
+
+        def _progress(role_id: str) -> int:
+            return _ival(_status(role_id), "progress")
+
+        def _money(role_id: str) -> int:
+            return _ival(_status(role_id), "money")
+
+        def _curiosity(role_id: str) -> int:
+            return _ival(_status(role_id), "curiosity")
+
+        def _stamina(role_id: str) -> int:
+            return _ival(_status(role_id), "stamina")
+
+        def _orange_total(role_id: str) -> int:
+            st = _status(role_id)
+            return _ival(st, "orange_product") + _ival(st, "orange_wear_product")
+
+        def _pick_target_high_progress(targets: list[str]) -> str | None:
+            if not targets:
                 return None
-            return random.choice(list(lst))
+            return max(targets, key=lambda rid: (_progress(rid), _money(rid), _curiosity(rid)))
 
-        def _pick_and(call, key):
-            target = _pick(info.get(key, []))
-            return call(target) if target else self.flow.end_turn()
+        def _pick_target_low_progress(targets: list[str]) -> str | None:
+            if not targets:
+                return None
+            return min(targets, key=lambda rid: (_progress(rid), _money(rid), _curiosity(rid)))
 
-        def _pick_index_and(call, key):
-            items = info.get(key, [])
+        def _pick_trade_partner(partners: list[str]) -> str | None:
+            if not partners:
+                return None
+            return max(partners, key=lambda rid: (_money(rid), _curiosity(rid), _progress(rid)))
+
+        def _pick_target_orange_rich(targets: list[str]) -> str | None:
+            if not targets:
+                return None
+            return max(targets, key=lambda rid: (_orange_total(rid), _progress(rid)))
+
+        def _value_item_kind(kind: str) -> int:
+            return {"product": 1, "orange_product": 2, "orange_wear_product": 3}.get(kind, 0)
+
+        def _pick_exchange_option(options: list[dict], prefer_high: bool) -> int | None:
+            if not options:
+                return None
+            scored = []
+            for i, opt in enumerate(options):
+                kind = str(opt.get("kind", "")).strip()
+                scored.append((i, _value_item_kind(kind)))
+            if prefer_high:
+                return max(scored, key=lambda t: t[1])[0]
+            return min(scored, key=lambda t: t[1])[0]
+
+        def _choose_trade_item_index(items: list[dict], seller_id: str) -> int | None:
             if not items:
+                return None
+            seller_gs = load_player_gamestate(seller_id)
+            def _price(it):
+                kind = it.get("kind")
+                if not kind:
+                    return 0
+                return compute_trade_price(seller_gs=seller_gs, item_key=kind)
+            return max(range(len(items)), key=lambda i: _price(items[i]))
+
+        def _choose_draw_cost_index(choices: list[dict], role_id: str) -> int | None:
+            if not choices:
+                return None
+            st = _status(role_id)
+            weights = {
+                "stamina": 3,
+                "curiosity": 3,
+                "money": 2,
+                "orange_product": 2,
+                "orange_wear_product": 2,
+                "product": 1,
+            }
+            def _score(choice: dict) -> int:
+                costs = choice.get("costs", [])
+                score = 0
+                for k, w in weights.items():
+                    score += _ival(st, k) * w
+                for c in costs:
+                    if not isinstance(c, dict):
+                        continue
+                    res = str(c.get("resource", "")).strip()
+                    delta = int(c.get("delta", 0))
+                    score += delta * weights.get(res, 0)
+                return score
+            return max(range(len(choices)), key=lambda i: _score(choices[i]))
+
+        def _decide_photo_consent(target_id: str) -> bool:
+            if not target_id:
+                return False
+            pending = getattr(self.flow, "pending_interactive", {}) or {}
+            if pending.get("force_agree"):
+                return True
+            st = _status(target_id)
+            if target_id == "role_finn":
+                return True
+            if pending.get("force_if_target_wear"):
+                if _ival(st, "orange_wear_product") >= 1:
+                    return True
+            params = pending.get("params", {}) if isinstance(pending.get("params"), dict) else {}
+            try:
+                reject_delta = int(params.get("reject_target_curiosity_delta", 0))
+            except Exception:
+                reject_delta = 0
+            if reject_delta < 0 and (_curiosity(target_id) + reject_delta) < 2:
+                return True
+            return _money(target_id) <= 0
+
+        def _decide_trade_consent(target_id: str) -> bool:
+            pending = getattr(self.flow, "pending_interactive", {}) or {}
+            if pending.get("force_agree"):
+                return True
+            if not target_id:
+                return False
+            seller_id = pending.get("actor_id")
+            item = pending.get("item")
+            item_key = item.get("kind") if isinstance(item, dict) else item
+            if not item_key or not seller_id:
+                return False
+            seller_gs = load_player_gamestate(seller_id)
+            price = compute_trade_price(seller_gs=seller_gs, item_key=item_key)
+            buyer_money = _money(target_id)
+            if buyer_money <= price:
+                return False
+            if item_key == "orange_product":
+                return _orange_total(target_id) < 1
+            if item_key == "product":
+                return _ival(_status(target_id), "product") < 1
+            return False
+
+        def _decide_exchange_consent(target_id: str) -> bool:
+            pending = getattr(self.flow, "pending_interactive", {}) or {}
+            if pending.get("force_agree"):
+                return True
+            ac = pending.get("actor_choice") or {}
+            tc = pending.get("target_choice") or {}
+            receive = ac.get("kind")
+            give = tc.get("kind")
+            return _value_item_kind(receive) >= _value_item_kind(give)
+
+        def _decide_food_accept(target_id: str) -> bool:
+            pending = getattr(self.flow, "pending_interactive", {}) or {}
+            if pending.get("force_accept"):
+                return True
+            if not target_id:
+                return False
+            st = _status(target_id)
+            price = int(pending.get("price", 0) or 0)
+            need_cur = 2 + int(pending.get("cost_plus", 0) or 0)
+            finn_free = bool(pending.get("finn_free")) and target_id == "role_finn"
+            if _ival(st, "curiosity") < need_cur:
+                return False
+            if not finn_free and _ival(st, "money") < price:
+                return False
+            # 只在体力偏低时接受
+            return _ival(st, "stamina") <= 1
+
+        def _decide_perform_watch(target_id: str) -> bool:
+            if not target_id:
+                return False
+            st = _status(target_id)
+            if _ival(st, "curiosity") < 2:
+                return False
+            if _ival(st, "stamina") <= 1:
+                return True
+            if _ival(st, "curiosity") <= 2 and _ival(st, "money") >= 1:
+                return True
+            return False
+
+        def _choose_perform_benefit(target_id: str) -> str:
+            st = _status(target_id)
+            if _ival(st, "stamina") <= 1 and _ival(st, "curiosity") > 2:
+                return "stamina_plus_curiosity_minus"
+            if _ival(st, "money") >= 1 and _ival(st, "curiosity") <= 2:
+                return "money_minus_curiosity_plus"
+            return "stamina_plus_curiosity_minus"
+
+        def _decide_watch_list(target_id: str) -> bool:
+            return _curiosity(target_id) <= 1
+
+        def _decide_help(action_type: str) -> bool:
+            gs = load_player_gamestate("role_volunteer")
+            counters = gs.get("counters")
+            if not isinstance(counters, dict):
+                counters = {}
+            types = counters.get("help_types")
+            if not isinstance(types, list):
+                types = []
+            return action_type not in types
+
+        def _exchange_choose() -> dict:
+            opts = info.get("options", [])
+            if not opts:
                 return self.flow.end_turn()
-            return call(random.randrange(len(items)))
+            prefer_high = (getattr(self.flow, "pending_interactive", {}) or {}).get("stage") == "choose_target_item"
+            idx = _pick_exchange_option(opts, prefer_high=prefer_high)
+            if idx is None:
+                return self.flow.end_turn()
+            return self.flow.exchange_choose_option(idx)
 
         actions = {
-            "PHOTO_NEED_TARGET": lambda: _pick_and(self.flow.photo_choose_target, "targets"),
-            "WEAR_NEED_TARGET": lambda: _pick_and(self.flow.photo_choose_target, "targets"),
-            "PHOTO_NEED_CONSENT": lambda: self.flow.photo_consent(random.choice([True, False])),
-            "HELP_DECISION": lambda: self.flow.volunteer_help(random.choice([True, False])),
-            "FOOD_OFFER_DECIDE": lambda: self.flow.food_offer_decide(info.get("target_id", ""), random.choice([True, False])),
+            "PHOTO_NEED_TARGET": lambda: self.flow.photo_choose_target(_pick_target_high_progress(info.get("targets", [])) or ""),
+            "WEAR_NEED_TARGET": lambda: self.flow.photo_choose_target(_pick_target_high_progress(info.get("targets", [])) or ""),
+            "PHOTO_NEED_CONSENT": lambda: self.flow.photo_consent(_decide_photo_consent(info.get("target_id", ""))),
+            "HELP_DECISION": lambda: self.flow.volunteer_help(_decide_help(info.get("help_action", ""))),
+            "FOOD_OFFER_DECIDE": lambda: self.flow.food_offer_decide(info.get("target_id", ""), _decide_food_accept(info.get("target_id", ""))),
             "FOOD_OFFER_FORCE": lambda: self.flow.food_offer_decide(info.get("target_id", ""), True),
-            "PERFORM_WATCH_DECIDE": lambda: self.flow.perform_watch_decide(info.get("target_id", ""), random.choice([True, False])),
-            "PERFORM_WATCH_BENEFIT": lambda: self.flow.perform_watch_benefit(
-                info.get("target_id", ""), random.choice(["stamina_plus_curiosity_minus", "money_minus_curiosity_plus"])
-            ),
-            "GIFT_NEED_TARGET": lambda: _pick_and(self.flow.gift_choose_target, "targets"),
-            "EXCHANGE_NEED_TARGET": lambda: _pick_and(self.flow.exchange_choose_target, "targets"),
-            "EXCHANGE_NEED_CHOICE": lambda: _pick_index_and(self.flow.exchange_choose_option, "options"),
-            "EXCHANGE_NEED_CONSENT": lambda: self.flow.exchange_consent(random.choice([True, False])),
-            "EVENT_NEED_TARGET": lambda: _pick_and(self.flow.event_choose_target, "targets"),
-            "WATCH_DECIDE": lambda: self.flow.watch_decide(info.get("target_id", ""), random.choice([True, False])),
-            "TRADE_NEED_ITEM": lambda: _pick_index_and(self.flow.trade_choose_item, "items"),
-            "TRADE_NEED_PARTNER": lambda: _pick_and(self.flow.trade_choose_partner, "partners"),
-            "TRADE_NEED_CONSENT": lambda: self.flow.trade_consent(random.choice([True, False])),
+            "PERFORM_WATCH_DECIDE": lambda: self.flow.perform_watch_decide(info.get("target_id", ""), _decide_perform_watch(info.get("target_id", ""))),
+            "PERFORM_WATCH_BENEFIT": lambda: self.flow.perform_watch_benefit(info.get("target_id", ""), _choose_perform_benefit(info.get("target_id", ""))),
+            "GIFT_NEED_TARGET": lambda: self.flow.gift_choose_target(_pick_target_low_progress(info.get("targets", [])) or ""),
+            "EXCHANGE_NEED_TARGET": lambda: self.flow.exchange_choose_target(_pick_target_orange_rich(info.get("targets", [])) or ""),
+            "EXCHANGE_NEED_CHOICE": _exchange_choose,
+            "EXCHANGE_NEED_CONSENT": lambda: self.flow.exchange_consent(_decide_exchange_consent(info.get("target_id", ""))),
+            "EVENT_NEED_TARGET": lambda: self.flow.event_choose_target(_pick_target_low_progress(info.get("targets", [])) or ""),
+            "WATCH_DECIDE": lambda: self.flow.watch_decide(info.get("target_id", ""), _decide_watch_list(info.get("target_id", ""))),
+            "TRADE_NEED_ITEM": lambda: self.flow.trade_choose_item(_choose_trade_item_index(info.get("items", []), info.get("role_id", "")) or 0),
+            "TRADE_NEED_PARTNER": lambda: self.flow.trade_choose_partner(_pick_trade_partner(info.get("partners", [])) or ""),
+            "TRADE_NEED_CONSENT": lambda: self.flow.trade_consent(_decide_trade_consent(info.get("partner_id", info.get("target_id", "")))),
         }
 
         if ui_mode in actions:
@@ -278,18 +475,10 @@ class AutoPlayTab(ttk.Frame):
         # ---------------------------
         if ui_mode == "DRAW_NEED_COST_CHOICE":
             choices = info.get("choices", [])
-            opts = []
-            for i in range(len(choices)):
-                opts.append(("pay", i))
-            opts.append(("cancel", None))
-
-            kind, payload = random.choice(opts)
-            if kind == "cancel":
+            idx = _choose_draw_cost_index(choices, info.get("role_id", ""))
+            if idx is None:
                 return self.flow.end_turn()
-            else:
-                # i
-                i = payload
-                return self.flow.choose_draw_cost(i)[1]  # ("next_turn", info)
+            return self.flow.choose_draw_cost(idx)[1]  # ("next_turn", info)
 
         # ---------------------------
         # 默认：回合三选一（抽卡 / 技能 / 跳过）
@@ -298,16 +487,7 @@ class AutoPlayTab(ttk.Frame):
         # 有些角色可能没有技能；你如果在 info 里叫 can_use_skill/can_use_skill，都可以兼容
         can_skill = bool(info.get("can_use_skill", info.get("has_skill", True)))
 
-        actions = []
         if can_draw:
-            actions.append("DRAW")
-        if can_skill:
-            actions.append("SKILL")
-        actions.append("SKIP")
-
-        pick = random.choice(actions)
-
-        if pick == "DRAW":
             kind, payload = self.flow.request_draw()
             if kind == "next_turn":
                 return payload
@@ -322,7 +502,7 @@ class AutoPlayTab(ttk.Frame):
             # fallback
             return self.flow.end_turn()
 
-        if pick == "SKILL":
+        if can_skill:
             return self.flow.use_active_skill()
 
         # SKIP
