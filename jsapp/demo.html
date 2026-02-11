@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kingsday JS Demo</title>
+  <style>
+    :root {
+      --bg: linear-gradient(140deg, #fff2db, #eef9ff);
+      --ink: #1f2b38;
+      --muted: #5b6d82;
+      --card: #ffffffd9;
+      --line: #d2deec;
+      --a1: #e45f31;
+      --a2: #0f6e8c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Avenir Next", "PingFang SC", "Noto Sans SC", sans-serif;
+    }
+    .app { max-width: 1300px; margin: 0 auto; padding: 16px; display: grid; gap: 12px; min-height: 100vh; grid-template-rows: auto 1fr auto; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 8px 16px #27436a12; }
+    .top { padding: 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .title { font-size: 22px; font-weight: 700; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .pill { border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; font-size: 12px; color: var(--muted); background: #fff; }
+    button { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; font-weight: 600; background: #fff; color: var(--ink); cursor: pointer; }
+    button.primary { background: var(--a1); color: #fff; border-color: #c94f28; }
+    button.secondary { background: var(--a2); color: #fff; border-color: #0a556b; }
+    .board { position: relative; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(180deg, #f5fbff, #edf6ff); overflow: hidden; min-height: 620px; }
+    .board::before { content: ""; position: absolute; inset: 10% 14%; border: 2px dashed #cbd8ea; border-radius: 999px; }
+    .center {
+      position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+      width: min(380px, 80vw); z-index: 2;
+      background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 12px;
+      box-shadow: 0 10px 20px #35578422;
+    }
+    .center h2 { margin: 0 0 4px; font-size: 16px; }
+    .center .hint { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .role {
+      position: absolute; width: 220px; min-height: 140px; transform: translate(-50%, -50%);
+      background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 10px; z-index: 3;
+    }
+    .role.current { box-shadow: 0 0 0 2px #f6b39f, 0 10px 18px #d56d4333; }
+    .name { font-weight: 700; font-size: 14px; }
+    .id { color: var(--muted); font-size: 11px; margin-bottom: 4px; }
+    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; }
+    .stats div { font-size: 12px; }
+    .mini { margin-top: 4px; color: var(--muted); font-size: 11px; line-height: 1.35; }
+    .logs { background: #0f1a2b; color: #dfebff; border-radius: 12px; padding: 12px; font-family: Menlo, monospace; font-size: 12px; line-height: 1.45; max-height: 220px; overflow: auto; white-space: pre-wrap; }
+    @media (max-width: 760px) {
+      .role { width: 178px; }
+      .board { min-height: 780px; }
+      .board::before { inset: 16% 10%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="card top">
+      <div>
+        <div class="title">Kingsday Pure JS Demo</div>
+        <div class="row" id="meta"></div>
+      </div>
+      <div class="row">
+        <button id="manualBtn" class="secondary">手动模式</button>
+        <button id="autoBtn">自动模式</button>
+        <button id="stepBtn">自动走一步</button>
+        <button id="resetBtn">重开</button>
+      </div>
+    </header>
+
+    <section class="board" id="board">
+      <article class="center">
+        <h2 id="eventTitle">未开始</h2>
+        <div class="hint" id="turnHint">点击“重开”开始一局</div>
+        <div class="actions" id="actions"></div>
+      </article>
+    </section>
+
+    <footer class="logs" id="logs"></footer>
+  </div>
+
+  <script>
+    const ROLES = [
+      { id: 'role_finn', name: 'Finn', skill: '穿橙', draw: 'THEN: curiosity-1 THEN stamina-1' },
+      { id: 'role_tourist', name: '游客', skill: '拍照', draw: 'OR: money-1 / stamina-1' },
+      { id: 'role_vendor', name: '摊主', skill: '交易', draw: 'THEN: stamina-1' },
+      { id: 'role_food_vendor', name: '食物摊主', skill: '供餐', draw: 'OR: money-1 / curiosity-1' },
+      { id: 'role_performer', name: '表演者', skill: '表演', draw: 'THEN: stamina-1' },
+      { id: 'role_volunteer', name: '志愿者', skill: '帮助', draw: 'THEN: curiosity-1' },
+    ];
+
+    const EVENTS = [
+      { id: 'event_1', name: '广场热舞', apply(g, p){ p.status.curiosity += 1; g.logs.push(`[EVENT] ${p.name} 好奇心+1`);} },
+      { id: 'event_2', name: '突发降温', apply(g, p){ p.status.stamina = Math.max(0, p.status.stamina - 1); g.logs.push(`[EVENT] ${p.name} 体力-1`);} },
+      { id: 'event_3', name: '橙色风潮', apply(g, p){ p.status.orange_product += 1; g.logs.push(`[EVENT] ${p.name} 获得橙色物品`);} },
+      { id: 'event_4', name: '赞助到账', apply(g, p){ p.status.money += 1; g.logs.push(`[EVENT] ${p.name} 金钱+1`);} },
+    ];
+
+    const state = {
+      mode: 'manual',
+      timer: null,
+      busy: false,
+      event: null,
+      idx: 0,
+      round: 0,
+      players: [],
+      logs: [],
+      gameOver: false,
+    };
+
+    const dom = {
+      board: document.getElementById('board'),
+      meta: document.getElementById('meta'),
+      eventTitle: document.getElementById('eventTitle'),
+      turnHint: document.getElementById('turnHint'),
+      actions: document.getElementById('actions'),
+      logs: document.getElementById('logs'),
+      manualBtn: document.getElementById('manualBtn'),
+      autoBtn: document.getElementById('autoBtn'),
+      stepBtn: document.getElementById('stepBtn'),
+      resetBtn: document.getElementById('resetBtn'),
+    };
+
+    function freshStatus(roleId) {
+      const base = { stamina: 3, curiosity: 3, money: 3, product: 1, orange_product: 0, orange_wear_product: 0, progress: 0 };
+      if (roleId === 'role_finn') base.orange_product = 1;
+      if (roleId === 'role_volunteer') base.money = 2;
+      return base;
+    }
+
+    function newGame() {
+      state.players = ROLES.slice(0, 6).map(r => ({ ...r, status: freshStatus(r.id) }));
+      state.idx = 0;
+      state.round = 1;
+      state.event = null;
+      state.logs = ['=== Game Started (Demo) ==='];
+      state.gameOver = false;
+      render();
+    }
+
+    function currentPlayer() { return state.players[state.idx]; }
+
+    function nextTurn() {
+      state.idx += 1;
+      if (state.idx >= state.players.length) {
+        state.idx = 0;
+        state.round += 1;
+      }
+      if (state.round > 12) {
+        state.gameOver = true;
+        const sorted = [...state.players].sort((a,b)=>b.status.progress-a.status.progress);
+        const best = sorted[0]?.status.progress || 0;
+        const winners = sorted.filter(p => p.status.progress === best).map(p=>p.name).join(', ');
+        state.logs.push(`[END] 回合上限结束，赢家: ${winners}`);
+      }
+    }
+
+    function drawEvent() {
+      const p = currentPlayer();
+      p.status.stamina = Math.max(0, p.status.stamina - 1);
+      const ev = EVENTS[Math.floor(Math.random() * EVENTS.length)];
+      state.event = ev;
+      state.logs.push(`[TURN] ${p.name} 抽牌并支付 stamina-1`);
+      state.logs.push(`[CARD] ${ev.name}`);
+      ev.apply(state, p);
+      p.status.progress += 1;
+      state.logs.push(`[PROGRESS] ${p.name} progress+1`);
+      nextTurn();
+      render();
+    }
+
+    function skipDraw() {
+      const p = currentPlayer();
+      state.event = null;
+      state.logs.push(`[TURN] ${p.name} 选择不抽卡`);
+      const action = Math.random() < 0.5 ? 'skill' : 'skip';
+      if (action === 'skill') useSkill();
+      else {
+        state.logs.push(`[SKIP] ${p.name} 跳过`);
+        nextTurn();
+        render();
+      }
+    }
+
+    function useSkill() {
+      const p = currentPlayer();
+      state.logs.push(`[SKILL] ${p.name} 使用技能: ${p.skill}`);
+      if (p.id === 'role_tourist') {
+        const target = state.players.find(x => x.id !== p.id && (x.status.orange_product + x.status.orange_wear_product) > 0) || state.players[1];
+        if (p.status.money >= 1 && p.status.stamina >= 1) {
+          p.status.money -= 1; p.status.stamina -= 1; target.status.money += 1; p.status.progress += 1;
+          state.logs.push(`[PHOTO] ${p.name} 拍 ${target.name} 成功`);
+        } else {
+          state.logs.push(`[PHOTO] ${p.name} 资源不足`);
+        }
+      } else if (p.id === 'role_finn') {
+        if (p.status.orange_product >= 1 && p.status.stamina >= 1) {
+          p.status.orange_product -= 1; p.status.orange_wear_product += 1; p.status.stamina -= 1; p.status.progress += 1;
+          state.logs.push(`[WEAR] ${p.name} 穿戴橙色成功`);
+        } else {
+          state.logs.push(`[WEAR] ${p.name} 穿戴失败`);
+        }
+      } else {
+        p.status.progress += 1;
+      }
+      nextTurn();
+      render();
+    }
+
+    function setMode(mode) {
+      state.mode = mode;
+      dom.manualBtn.className = mode === 'manual' ? 'secondary' : '';
+      dom.autoBtn.className = mode === 'auto' ? 'secondary' : '';
+      if (state.timer) { clearInterval(state.timer); state.timer = null; }
+      if (mode === 'auto') {
+        state.timer = setInterval(() => {
+          if (state.busy || state.gameOver) return;
+          autoStep();
+        }, 700);
+      }
+      renderMeta();
+    }
+
+    function autoStep() {
+      if (state.gameOver) return;
+      const p = currentPlayer();
+      if (p.status.stamina >= 1 && Math.random() < 0.65) drawEvent();
+      else skipDraw();
+    }
+
+    function addAction(label, fn, cls='') {
+      const b = document.createElement('button');
+      b.textContent = label;
+      if (cls) b.className = cls;
+      b.onclick = fn;
+      dom.actions.appendChild(b);
+    }
+
+    function renderMeta() {
+      dom.meta.innerHTML = '';
+      [
+        `Round ${state.round}`,
+        `当前 ${currentPlayer()?.name || '-'}`,
+        state.mode === 'auto' ? '自动模式' : '手动模式',
+        state.gameOver ? '已结束' : '进行中',
+      ].forEach(t => {
+        const el = document.createElement('span');
+        el.className = 'pill';
+        el.textContent = t;
+        dom.meta.appendChild(el);
+      });
+    }
+
+    function renderRoles() {
+      dom.board.querySelectorAll('.role').forEach(x => x.remove());
+      const n = state.players.length || 1;
+      const r = dom.board.getBoundingClientRect();
+      const cx = r.width / 2, cy = r.height / 2;
+      const rx = Math.max(200, Math.min(r.width * 0.38, 460));
+      const ry = Math.max(170, Math.min(r.height * 0.34, 300));
+      const cur = currentPlayer()?.id;
+
+      state.players.forEach((p, i) => {
+        const ang = -Math.PI/2 + 2*Math.PI*i/n;
+        const x = cx + rx * Math.cos(ang);
+        const y = cy + ry * Math.sin(ang);
+        const s = p.status;
+        const card = document.createElement('article');
+        card.className = `role${p.id===cur ? ' current' : ''}`;
+        card.style.left = `${x}px`;
+        card.style.top = `${y}px`;
+        card.innerHTML = `
+          <div class="name">${p.name}</div>
+          <div class="id">${p.id}</div>
+          <div class="stats">
+            <div>stamina: ${s.stamina}</div><div>curiosity: ${s.curiosity}</div>
+            <div>money: ${s.money}</div><div>product: ${s.product}</div>
+            <div>orange: ${s.orange_product}</div><div>wear: ${s.orange_wear_product}</div>
+            <div>progress: ${s.progress}</div>
+          </div>
+          <div class="mini">能力: ${p.skill}</div>
+          <div class="mini">抽卡条件: ${p.draw}</div>
+        `;
+        dom.board.appendChild(card);
+      });
+    }
+
+    function renderCenter() {
+      const p = currentPlayer();
+      dom.eventTitle.textContent = state.event ? `事件: ${state.event.name}` : '事件: 暂无';
+      dom.turnHint.textContent = state.gameOver ? '游戏结束（Demo）' : `当前回合: ${p.name} (${p.id})`;
+      dom.actions.innerHTML = '';
+      if (state.gameOver) return;
+      addAction('抽事件卡', drawEvent, 'primary');
+      addAction('不抽卡', skipDraw);
+      addAction('使用技能', useSkill, 'secondary');
+      addAction('跳过', () => { state.logs.push(`[SKIP] ${p.name} 跳过`); nextTurn(); render(); });
+    }
+
+    function renderLogs() {
+      dom.logs.textContent = state.logs.join('\n');
+      dom.logs.scrollTop = dom.logs.scrollHeight;
+    }
+
+    function render() {
+      renderMeta();
+      renderRoles();
+      renderCenter();
+      renderLogs();
+    }
+
+    dom.manualBtn.onclick = () => setMode('manual');
+    dom.autoBtn.onclick = () => setMode('auto');
+    dom.stepBtn.onclick = autoStep;
+    dom.resetBtn.onclick = newGame;
+    window.addEventListener('resize', renderRoles);
+
+    newGame();
+    setMode('manual');
+  </script>
+</body>
+</html>
