@@ -1,0 +1,1148 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Balance Lab - 回合制卡牌测试</title>
+  <style>
+    :root {
+      --bg: linear-gradient(145deg, #fff1d7, #ecf7ff);
+      --ink: #1f2b38;
+      --muted: #56708a;
+      --line: #d2ddeb;
+      --panel: #ffffffdc;
+      --accent: #e7602f;
+      --accent2: #0f6d8a;
+      --ok: #237b3e;
+      --warn: #9b5f12;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background: var(--bg);
+      font-family: "Avenir Next", "PingFang SC", "Noto Sans SC", sans-serif;
+    }
+    .app {
+      max-width: 1800px;
+      margin: 0 auto;
+      padding: 14px;
+      display: grid;
+      gap: 12px;
+      grid-template-rows: auto 1fr auto;
+      min-height: 100vh;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: 0 10px 24px #2b456911;
+    }
+    .top {
+      padding: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .title {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: .02em;
+    }
+    .sub {
+      margin-top: 4px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .pill {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 12px;
+      color: var(--muted);
+      background: #fff;
+    }
+    button {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px 12px;
+      background: #fff;
+      color: var(--ink);
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button.primary { background: var(--accent); border-color: #cb5126; color: #fff; }
+    button.secondary { background: var(--accent2); border-color: #0b566e; color: #fff; }
+    button.warn { background: #fff7ed; border-color: #efcfad; color: var(--warn); }
+    .layout {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 12px;
+      min-height: 620px;
+    }
+    .layout.playing {
+      grid-template-columns: 1fr;
+    }
+    .setup {
+      padding: 12px;
+      overflow: auto;
+    }
+    .setup h2 { margin: 0 0 10px; font-size: 16px; }
+    .setup-list { display: grid; gap: 6px; }
+    .setup-item {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .board {
+      position: relative;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, #f4fbff, #edf6ff);
+      overflow: hidden;
+      min-height: clamp(620px, 72vh, 980px);
+    }
+    .board::before {
+      content: "";
+      position: absolute;
+      inset: 10% 12%;
+      border: 2px dashed #c9d8ea;
+      border-radius: 999px;
+    }
+    .center {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: min(420px, 82vw);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fff;
+      padding: 12px;
+      z-index: 5;
+      box-shadow: 0 12px 24px #34587f22;
+    }
+    .center h2 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 800;
+    }
+    .hint {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    .actions {
+      margin-top: 8px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .role {
+      position: absolute;
+      width: 220px;
+      min-height: 148px;
+      transform: translate(-50%, -50%);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+      padding: 10px;
+      z-index: 3;
+    }
+    .role.current {
+      box-shadow: 0 0 0 2px #f6b8a4, 0 10px 20px #d5704530;
+    }
+    .name { font-size: 14px; font-weight: 800; }
+    .id { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2px 8px;
+    }
+    .stats div { font-size: 12px; }
+    .mini {
+      margin-top: 4px;
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+    .win { color: var(--ok); font-weight: 800; }
+    .logs {
+      background: #101a2a;
+      color: #deebff;
+      border-radius: 12px;
+      padding: 12px;
+      font-family: Menlo, monospace;
+      font-size: 12px;
+      line-height: 1.45;
+      max-height: 220px;
+      overflow: auto;
+      white-space: pre-wrap;
+    }
+    @media (max-width: 1120px) {
+      .layout { grid-template-columns: 1fr; }
+      .board { min-height: 760px; }
+    }
+    @media (max-width: 760px) {
+      .role { width: 180px; }
+      .board::before { inset: 16% 10%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="card top">
+      <div>
+        <div class="title">Balance Lab</div>
+        <div class="sub">角色扮演回合制卡牌平衡测试（单页原生 JS）</div>
+      </div>
+      <div class="row">
+        <button id="manualBtn" class="secondary">手动模式</button>
+        <button id="autoBtn">自动模式</button>
+        <button id="stepBtn">自动走一步</button>
+        <button id="resetBtn" class="warn">重置</button>
+      </div>
+    </header>
+
+    <main id="layout" class="layout">
+      <aside id="setup" class="card setup">
+        <h2>选择角色（2-6）</h2>
+        <div id="setupRoles" class="setup-list"></div>
+        <div class="row" style="margin-top: 10px;">
+          <button id="startBtn" class="primary">开始游戏</button>
+        </div>
+      </aside>
+
+      <section id="board" class="board">
+        <article class="center">
+          <h2 id="centerTitle">等待开局</h2>
+          <div id="centerHint" class="hint">请选择角色并开始。每回合当前角色二选一：抽卡或技能。</div>
+          <div id="meta" class="row" style="margin-top: 6px;"></div>
+          <div id="actions" class="actions"></div>
+        </article>
+      </section>
+    </main>
+
+    <footer id="logs" class="logs"></footer>
+  </div>
+
+  <script>
+    const RES_ORDER = ["curiosity", "money", "stamina", "product", "orange_product", "orange_wear_product", "progress"];
+    const RES_LABEL = {
+      curiosity: "🔍",
+      money: "💰",
+      stamina: "❤️",
+      product: "📦",
+      orange_product: "👑",
+      orange_wear_product: "🤴🏻",
+      progress: "🏁",
+    };
+
+    const ROLE_DEFS = {
+      role_finn: {
+        id: "role_finn",
+        name: "Finn",
+        drawCost: { logic: "THEN", options: [[["stamina", -1]], [["curiosity", -1]]] },
+        skillId: "finn_wear_from_other",
+        skillName: "向他人要橙色并穿戴",
+        skillDesc: "选择一名拥有橙色物品的玩家，对方可同意；同意则 Finn 穿戴+1，进度+1。",
+        // Finn 初始资源（按需求）
+        // 🔍2 | 💰0 | ❤️3 | 📦0 | 👑0 | 🤴🏻0
+        init: { curiosity: 2, money: 0, stamina: 3, product: 0, orange_product: 0, orange_wear_product: 0, progress: 0 },
+        win: (p) => (p.status.orange_wear_product || 0) >= 3,
+        winDesc: "穿上 3 件橙色物品（🤴🏻≥3）",
+      },
+      role_tourist: {
+        id: "role_tourist",
+        name: "游客",
+        drawCost: { logic: "OR", options: [[["money", -1]], [["curiosity", -1]]] },
+        skillId: "tourist_photo",
+        skillName: "拍照",
+        skillDesc: "选择目标并由目标决定是否同意；成功后游客获得进度。",
+        // 游客初始资源
+        // 🔍2 | 💰6 | ❤️4 | 📦1 | 👑0 | 🤴🏻0
+        init: { curiosity: 2, money: 6, stamina: 4, product: 1, orange_product: 0, orange_wear_product: 0, progress: 0 },
+        win: (p) => (p.counters.photos || 0) >= 5,
+        winDesc: "成功拍照 5 次（Finn 最多拍 1 次）",
+      },
+      role_vendor: {
+        id: "role_vendor",
+        name: "摊主",
+        drawCost: { logic: "THEN", options: [[["stamina", -1]], [["money", -1]]] },
+        skillId: "vendor_trade",
+        skillName: "交易",
+        skillDesc: "选择物品与买家，买家可同意/拒绝；成功交易推进胜利。",
+        // 摊主初始资源
+        // 🔍2 | 💰0 | ❤️6 | 📦2 | 👑1 | 🤴🏻0
+        init: { curiosity: 2, money: 0, stamina: 6, product: 2, orange_product: 1, orange_wear_product: 0, progress: 0 },
+        win: (p, g) => {
+          const needTrades = Math.max(1, g.players.length - 1);
+          const uniq = new Set(p.counters.trade_partners || []);
+          return (p.counters.trades || 0) >= needTrades && uniq.size >= Math.max(1, needTrades - 1);
+        },
+        winDesc: "交易次数和交易对象覆盖达标",
+      },
+      role_food_vendor: {
+        id: "role_food_vendor",
+        name: "食物摊主",
+        drawCost: { logic: "THEN", options: [[["curiosity", -1]]] },
+        skillId: "food_offer",
+        skillName: "供餐",
+        skillDesc: "依次询问他人是否购买食物，达到人数阈值获得进度。",
+        // 食物供应商初始资源
+        // 🔍3 | 💰0 | ❤️1 | 📦0 | 👑0 | 🤴🏻0
+        init: { curiosity: 3, money: 0, stamina: 1, product: 0, orange_product: 0, orange_wear_product: 0, progress: 0 },
+        win: (p) => {
+          const uniq = new Set(p.counters.feed_eaters || []);
+          return (p.counters.feed_successes || 0) >= 3 && uniq.size >= 3;
+        },
+        winDesc: "供餐成功 3 次且覆盖 3 名不同玩家",
+      },
+      role_performer: {
+        id: "role_performer",
+        name: "表演者",
+        drawCost: { logic: "THEN", options: [[["money", -1]], [["stamina", -1]]] },
+        skillId: "perform_show",
+        skillName: "表演",
+        skillDesc: "依次询问围观，围观者选择收益；达标则表演成功。",
+        // 表演者初始资源
+        // 🔍2 | 💰1 | ❤️6 | 📦0 | 👑1 | 🤴🏻1
+        init: { curiosity: 2, money: 1, stamina: 6, product: 0, orange_product: 1, orange_wear_product: 1, progress: 0 },
+        win: (p) => (p.counters.perform_successes || 0) >= 2,
+        winDesc: "成功表演 2 次",
+      },
+      role_volunteer: {
+        id: "role_volunteer",
+        name: "志愿者",
+        drawCost: { logic: "OR", options: [[["stamina", -2]], [["stamina", -1], ["curiosity", -1]]] },
+        skillId: "volunteer_help",
+        skillName: "帮助",
+        skillDesc: "选择帮助类型和目标，目标可同意；新帮助类型会累计胜利进度。",
+        // 志愿者初始资源
+        // 🔍2 | 💰5 | ❤️2 | 📦1 | 👑0 | 🤴🏻0
+        init: { curiosity: 2, money: 5, stamina: 2, product: 1, orange_product: 0, orange_wear_product: 0, progress: 0 },
+        win: (p) => new Set(p.counters.help_types || []).size >= 3,
+        winDesc: "达成 3 种不同帮助类型",
+      },
+    };
+
+    const EVENT_DECK_BASE = [
+      { id: "e1", name: "橙色浪潮", apply: (g, actor) => add(actor, "orange_product", 1) },
+      { id: "e2", name: "突发降温", apply: (g, actor) => add(actor, "stamina", -1) },
+      { id: "e3", name: "观众热情", apply: (g, actor) => add(actor, "curiosity", 1) },
+      { id: "e4", name: "赞助到账", apply: (g, actor) => add(actor, "money", 1) },
+      { id: "e5", name: "低迷时段", apply: (g) => g.players.forEach((p) => add(p, "curiosity", -1)) },
+      { id: "e6", name: "活力补给", apply: (g) => g.players.forEach((p) => add(p, "stamina", 1)) },
+      { id: "e7", name: "橙色评选", apply: (g, actor) => add(actor, "orange_wear_product", 1) },
+      { id: "e8", name: "临时摊位", apply: (g, actor) => add(actor, "product", 1) },
+      { id: "e9", name: "交通拥堵", apply: (g, actor) => add(actor, "stamina", -2) },
+      { id: "e10", name: "游客爆发", apply: (g) => g.players.forEach((p) => add(p, "curiosity", 1)) },
+      { id: "e11", name: "全场合照", apply: (g) => g.players.forEach((p) => add(p, "money", 1)) },
+      { id: "e12", name: "随机惊喜", apply: (g, actor) => add(actor, pick(["stamina", "curiosity", "money"]), 1) },
+    ];
+
+    const state = {
+      mode: "manual",
+      autoTimer: null,
+      game: null,
+      busy: false,
+    };
+
+    const dom = {
+      layout: document.getElementById("layout"),
+      setup: document.getElementById("setup"),
+      setupRoles: document.getElementById("setupRoles"),
+      board: document.getElementById("board"),
+      centerTitle: document.getElementById("centerTitle"),
+      centerHint: document.getElementById("centerHint"),
+      meta: document.getElementById("meta"),
+      actions: document.getElementById("actions"),
+      logs: document.getElementById("logs"),
+      startBtn: document.getElementById("startBtn"),
+      resetBtn: document.getElementById("resetBtn"),
+      manualBtn: document.getElementById("manualBtn"),
+      autoBtn: document.getElementById("autoBtn"),
+      stepBtn: document.getElementById("stepBtn"),
+    };
+
+    function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+    function clone(v) { return JSON.parse(JSON.stringify(v)); }
+    function getRoleDef(roleId) { return ROLE_DEFS[roleId]; }
+
+    function add(player, key, delta) {
+      player.status[key] = Math.max(0, (player.status[key] || 0) + delta);
+    }
+
+    function canPay(player, costs) {
+      return costs.every(([res, d]) => (player.status[res] || 0) + d >= 0);
+    }
+
+    function findPlayer(roleId) {
+      return state.game.players.find((p) => p.roleId === roleId);
+    }
+
+    function roleName(roleId) {
+      const p = findPlayer(roleId);
+      return p ? p.name : roleId;
+    }
+
+    function currentPlayer() {
+      return state.game.players[state.game.turnIndex];
+    }
+
+    function pushLog(text) {
+      state.game.logs.push(text);
+    }
+
+    function initSetup() {
+      dom.setupRoles.innerHTML = "";
+      Object.values(ROLE_DEFS).forEach((r) => {
+        const row = document.createElement("label");
+        row.className = "setup-item";
+        row.innerHTML = `<input type="checkbox" value="${r.id}" checked /> <span>${r.name} (${r.id})</span>`;
+        dom.setupRoles.appendChild(row);
+      });
+    }
+
+    function startGame(selectedRoleIds) {
+      const players = selectedRoleIds.map((id) => {
+        const def = getRoleDef(id);
+        return {
+          roleId: id,
+          name: def.name,
+          status: clone(def.init),
+          counters: {},
+          win: false,
+        };
+      });
+      state.game = {
+        players,
+        turnIndex: 0,
+        round: 1,
+        gameOver: false,
+        winners: [],
+        deck: shuffle(EVENT_DECK_BASE.map((x) => ({ ...x }))),
+        discard: [],
+        currentEvent: null,
+        ui: { mode: "TURN_CHOICE" },
+        logs: ["=== Game Started ==="],
+        lastDrawCost: "",
+      };
+      render();
+    }
+
+    function shuffle(arr) {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function advanceTurn() {
+      if (checkWinners()) {
+        state.game.gameOver = true;
+        state.game.ui = { mode: "GAME_OVER" };
+        return;
+      }
+      state.game.turnIndex += 1;
+      if (state.game.turnIndex >= state.game.players.length) {
+        state.game.turnIndex = 0;
+        state.game.round += 1;
+      }
+      state.game.currentEvent = null;
+      state.game.lastDrawCost = "";
+      state.game.ui = { mode: "TURN_CHOICE" };
+      pushLog(`--- Turn: ${currentPlayer().name} ---`);
+    }
+
+    function checkWinners() {
+      const winners = [];
+      state.game.players.forEach((p) => {
+        const def = getRoleDef(p.roleId);
+        if (def.win(p, state.game)) {
+          p.win = true;
+          winners.push(p.roleId);
+        }
+      });
+      if (winners.length > 0) {
+        state.game.winners = winners;
+        pushLog(`[WIN] Winner(s): ${winners.map(roleName).join(", ")}`);
+        return true;
+      }
+      return false;
+    }
+
+    function requestDraw() {
+      const p = currentPlayer();
+      const def = getRoleDef(p.roleId);
+      const cfg = def.drawCost;
+      const payable = cfg.options.filter((costs) => canPay(p, costs));
+      if (!payable.length) {
+        pushLog(`[DRAW] ${p.name} cannot pay draw cost.`);
+        state.game.ui = { mode: "TURN_CHOICE" };
+        render();
+        return;
+      }
+      if (cfg.logic === "THEN") {
+        const costs = payable[0];
+        applyCosts(p, costs);
+        state.game.lastDrawCost = formatCosts(costs);
+        pushLog(`[DRAW] Paid: ${state.game.lastDrawCost}`);
+        resolveDrawCard();
+        return;
+      }
+      state.game.ui = {
+        mode: "DRAW_COST_CHOICE",
+        options: payable,
+      };
+      render();
+    }
+
+    function chooseDrawCost(index) {
+      const ui = state.game.ui;
+      if (!ui || ui.mode !== "DRAW_COST_CHOICE") return;
+      const costs = ui.options[index];
+      if (!costs) return;
+      const p = currentPlayer();
+      applyCosts(p, costs);
+      state.game.lastDrawCost = formatCosts(costs);
+      pushLog(`[DRAW] Paid: ${state.game.lastDrawCost}`);
+      resolveDrawCard();
+    }
+
+    function applyCosts(player, costs) {
+      costs.forEach(([res, d]) => add(player, res, d));
+    }
+
+    function formatCosts(costs) {
+      return costs.map(([k, v]) => `${k}${v}`).join(", ");
+    }
+
+    function resolveDrawCard() {
+      if (!state.game.deck.length) {
+        pushLog("[EVENT] No cards left.");
+        advanceTurn();
+        render();
+        return;
+      }
+      const card = state.game.deck.shift();
+      state.game.discard.push(card);
+      state.game.currentEvent = card;
+      pushLog(`[EVENT] ${card.name}`);
+      card.apply(state.game, currentPlayer());
+      render();
+      advanceTurn();
+      render();
+    }
+
+    function useSkill() {
+      const p = currentPlayer();
+      const def = getRoleDef(p.roleId);
+      pushLog(`[SKILL] ${p.name}: ${def.skillName}`);
+      if (def.skillId === "finn_wear_from_other") return startFinnSkill(p);
+      if (def.skillId === "tourist_photo") return startTouristSkill(p);
+      if (def.skillId === "vendor_trade") return startVendorSkill(p);
+      if (def.skillId === "food_offer") return startFoodSkill(p);
+      if (def.skillId === "perform_show") return startPerformSkill(p);
+      if (def.skillId === "volunteer_help") return startVolunteerSkill(p);
+    }
+
+    function startFinnSkill(actor) {
+      const targets = state.game.players.filter((x) => x.roleId !== actor.roleId && x.status.orange_product > 0).map((x) => x.roleId);
+      if (!targets.length) {
+        pushLog("[SKILL] No one can give orange item.");
+        advanceTurn();
+        render();
+        return;
+      }
+      state.game.ui = { mode: "FINN_TARGET", actor: actor.roleId, targets };
+      render();
+    }
+    function finnChooseTarget(targetId) {
+      const ui = state.game.ui;
+      if (!ui || ui.mode !== "FINN_TARGET") return;
+      state.game.ui = { mode: "FINN_CONSENT", actor: ui.actor, target: targetId };
+      render();
+    }
+    function finnConsent(agree) {
+      const ui = state.game.ui;
+      if (!ui || ui.mode !== "FINN_CONSENT") return;
+      const actor = findPlayer(ui.actor);
+      const target = findPlayer(ui.target);
+      if (agree && target.status.orange_product > 0) {
+        add(target, "orange_product", -1);
+        add(actor, "orange_wear_product", 1);
+        add(actor, "progress", 1);
+        actor.counters.orange_worn = (actor.counters.orange_worn || 0) + 1;
+        pushLog(`[SKILL] ${target.name} gave orange item to ${actor.name}.`);
+      } else {
+        pushLog(`[SKILL] ${target.name} refused.`);
+      }
+      advanceTurn();
+      render();
+    }
+
+    function validPhotoTargets(actor) {
+      const photoTargets = actor.counters.photo_targets || [];
+      return state.game.players
+        .filter((x) => x.roleId !== actor.roleId)
+        .filter((x) => {
+          // 目标必须有橙色物品（已佩戴或未佩戴）
+          const hasOrange = (x.status.orange_product || 0) + (x.status.orange_wear_product || 0) >= 1;
+          if (!hasOrange) return false;
+          // Finn 只能被拍一次（按游客个人记录）
+          if (x.roleId === "role_finn" && photoTargets.includes("role_finn")) return false;
+          return true;
+        }).map((x) => x.roleId);
+    }
+    function startTouristSkill(actor) {
+      const targets = validPhotoTargets(actor);
+      if (!targets.length) {
+        pushLog("[PHOTO] No valid target.");
+        advanceTurn();
+        render();
+        return;
+      }
+      state.game.ui = { mode: "PHOTO_TARGET", actor: actor.roleId, targets };
+      render();
+    }
+    function photoChooseTarget(targetId) {
+      const ui = state.game.ui;
+      if (!ui || ui.mode !== "PHOTO_TARGET") return;
+      state.game.ui = { mode: "PHOTO_CONSENT", actor: ui.actor, target: targetId };
+      render();
+    }
+    function photoConsent(agree) {
+      const ui = state.game.ui;
+      if (!ui || ui.mode !== "PHOTO_CONSENT") return;
+      const actor = findPlayer(ui.actor);
+      const target = findPlayer(ui.target);
+      if (agree) {
+        // Finn 每位游客最多拍一次（防止绕过目标过滤）
+        actor.counters.photo_targets = actor.counters.photo_targets || [];
+        if (target.roleId === "role_finn" && actor.counters.photo_targets.includes("role_finn")) {
+          pushLog("[PHOTO] Finn can only be photographed once by the same tourist.");
+          advanceTurn();
+          render();
+          return;
+        }
+        if ((actor.status.money || 0) >= 1 && (actor.status.stamina || 0) >= 1) {
+          add(actor, "money", -1);
+          add(actor, "stamina", -1);
+          add(target, "money", 1);
+          add(actor, "progress", 1);
+          actor.counters.photos = (actor.counters.photos || 0) + 1;
+          actor.counters.photo_targets = actor.counters.photo_targets || [];
+          if (!actor.counters.photo_targets.includes(target.roleId)) actor.counters.photo_targets.push(target.roleId);
+          pushLog(`[PHOTO] ${actor.name} photographed ${target.name}.`);
+        } else {
+          pushLog("[PHOTO] Not enough money/stamina.");
+        }
+      } else {
+        pushLog(`[PHOTO] ${target.name} refused.`);
+      }
+      advanceTurn();
+      render();
+    }
+
+    function vendorItems(actor) {
+      const out = [];
+      if (actor.status.product > 0) out.push({ key: "product", label: "普通物品", price: 1 });
+      if (actor.status.orange_product > 0) out.push({ key: "orange_product", label: "橙色物品", price: 2 });
+      return out;
+    }
+    function startVendorSkill(actor) {
+      const items = vendorItems(actor);
+      if (!items.length) {
+        pushLog("[TRADE] No item to sell.");
+        advanceTurn();
+        render();
+        return;
+      }
+      state.game.ui = { mode: "TRADE_ITEM", actor: actor.roleId, items };
+      render();
+    }
+    function tradeChooseItem(index) {
+      const ui = state.game.ui;
+      if (!ui || ui.mode !== "TRADE_ITEM") return;
+      const item = ui.items[index];
+      if (!item) return;
+      const actor = findPlayer(ui.actor);
+      const partners = state.game.players
+        .filter((x) => x.roleId !== actor.roleId)
+        .filter((x) =>
+          actor.status.curiosity >= 2 &&
+          x.status.curiosity >= 2 &&
+          actor.status.stamina >= 1 &&
+          x.status.money > item.price
+        ).map((x) => x.roleId);
+      if (!partners.length) {
+        pushLog("[TRADE] No eligible buyer.");
+        advanceTurn();
+        render();
+        return;
+      }
+      state.game.ui = { mode: "TRADE_PARTNER", actor: actor.roleId, item, partners };
+      render();
+    }
+    function tradeChoosePartner(partnerId) {
+      const ui = state.game.ui;
+      if (!ui || ui.mode !== "TRADE_PARTNER") return;
+      state.game.ui = { mode: "TRADE_CONSENT", actor: ui.actor, item: ui.item, partner: partnerId };
+      render();
+    }
+    function tradeConsent(agree) {
+      const ui = state.game.ui;
+      if (!ui || ui.mode !== "TRADE_CONSENT") return;
+      const actor = findPlayer(ui.actor);
+      const partner = findPlayer(ui.partner);
+      if (agree) {
+        if ((actor.status[ui.item.key] || 0) > 0 && partner.status.money > ui.item.price && actor.status.stamina >= 1) {
+          add(actor, ui.item.key, -1);
+          add(partner, ui.item.key, 1);
+          add(partner, "money", -ui.item.price);
+          add(actor, "money", ui.item.price);
+          add(actor, "stamina", -1);
+          add(actor, "progress", 1);
+          actor.counters.trades = (actor.counters.trades || 0) + 1;
+          actor.counters.trade_partners = actor.counters.trade_partners || [];
+          if (!actor.counters.trade_partners.includes(partner.roleId)) actor.counters.trade_partners.push(partner.roleId);
+          pushLog(`[TRADE] ${actor.name} traded with ${partner.name}.`);
+        } else {
+          pushLog("[TRADE] Requirements not met.");
+        }
+      } else {
+        pushLog(`[TRADE] ${partner.name} refused.`);
+      }
+      advanceTurn();
+      render();
+    }
+
+    function startFoodSkill(actor) {
+      const targets = state.game.players.filter((x) => x.roleId !== actor.roleId).map((x) => x.roleId);
+      if (!targets.length) {
+        advanceTurn();
+        render();
+        return;
+      }
+      state.game.ui = { mode: "FOOD_DECIDE", actor: actor.roleId, queue: targets, buyers: [], price: 1 };
+      render();
+    }
+    function foodDecide(accept) {
+      const ui = state.game.ui;
+      if (!ui || ui.mode !== "FOOD_DECIDE") return;
+      const actor = findPlayer(ui.actor);
+      const targetId = ui.queue[0];
+      const buyer = findPlayer(targetId);
+      if (accept && buyer.status.curiosity >= 2 && buyer.status.money >= ui.price) {
+        add(buyer, "money", -ui.price);
+        add(buyer, "stamina", 1);
+        add(actor, "money", ui.price);
+        ui.buyers.push(targetId);
+        pushLog(`[FOOD] ${buyer.name} bought food.`);
+      } else if (accept) {
+        pushLog(`[FOOD] ${buyer.name} failed to buy (requirements).`);
+      } else {
+        pushLog(`[FOOD] ${buyer.name} skipped.`);
+      }
+      ui.queue.shift();
+      if (!ui.queue.length) {
+        if (ui.buyers.length >= 2) {
+          add(actor, "progress", 1);
+          actor.counters.feed_successes = (actor.counters.feed_successes || 0) + 1;
+          actor.counters.feed_eaters = actor.counters.feed_eaters || [];
+          ui.buyers.forEach((id) => { if (!actor.counters.feed_eaters.includes(id)) actor.counters.feed_eaters.push(id); });
+          pushLog("[FOOD] Offer success.");
+        } else {
+          pushLog("[FOOD] Offer failed.");
+        }
+        advanceTurn();
+        render();
+        return;
+      }
+      state.game.ui = ui;
+      render();
+    }
+
+    function startPerformSkill(actor) {
+      if (actor.status.stamina < 2) {
+        pushLog("[PERFORM] Not enough stamina.");
+        advanceTurn();
+        render();
+        return;
+      }
+      const queue = state.game.players.filter((x) => x.roleId !== actor.roleId).map((x) => x.roleId);
+      state.game.ui = { mode: "PERFORM_WATCH", actor: actor.roleId, queue, watchers: [], current: queue[0] };
+      render();
+    }
+    function performWatch(watch) {
+      const ui = state.game.ui;
+      if (!ui || ui.mode !== "PERFORM_WATCH") return;
+      if (!watch) {
+        ui.queue.shift();
+        if (!ui.queue.length) return finishPerform(ui);
+        ui.current = ui.queue[0];
+        render();
+        return;
+      }
+      state.game.ui = { ...ui, mode: "PERFORM_BENEFIT" };
+      render();
+    }
+    function performBenefit(choice) {
+      const ui = state.game.ui;
+      if (!ui || ui.mode !== "PERFORM_BENEFIT") return;
+      const actor = findPlayer(ui.actor);
+      const watcher = findPlayer(ui.current);
+      if (choice === "money") {
+        if (watcher.status.money >= 1) {
+          add(watcher, "money", -1);
+          add(actor, "money", 1);
+          add(watcher, "curiosity", 1);
+        }
+      } else {
+        add(watcher, "stamina", 1);
+        add(watcher, "curiosity", -1);
+      }
+      ui.watchers.push(watcher.roleId);
+      ui.queue.shift();
+      if (!ui.queue.length) return finishPerform(ui);
+      state.game.ui = { ...ui, mode: "PERFORM_WATCH", current: ui.queue[0] };
+      render();
+    }
+    function finishPerform(ui) {
+      const actor = findPlayer(ui.actor);
+      const success = ui.watchers.length >= 2;
+      if (success) {
+        add(actor, "stamina", -2);
+        add(actor, "progress", 1);
+        actor.counters.perform_successes = (actor.counters.perform_successes || 0) + 1;
+        pushLog("[PERFORM] Success.");
+      } else {
+        add(actor, "stamina", -1);
+        pushLog("[PERFORM] Failed.");
+      }
+      advanceTurn();
+      render();
+    }
+
+    function startVolunteerSkill(actor) {
+      const targets = state.game.players.filter((x) => x.roleId !== actor.roleId).map((x) => x.roleId);
+      const helpTypes = ["photo", "trade", "food", "perform"];
+      if (!targets.length) {
+        advanceTurn();
+        render();
+        return;
+      }
+      state.game.ui = { mode: "VOL_TARGET", actor: actor.roleId, targets, helpTypes };
+      render();
+    }
+    function volunteerChooseTarget(targetId) {
+      const ui = state.game.ui;
+      if (!ui || ui.mode !== "VOL_TARGET") return;
+      state.game.ui = { mode: "VOL_TYPE", actor: ui.actor, target: targetId, helpTypes: ui.helpTypes };
+      render();
+    }
+    function volunteerChooseType(type) {
+      const ui = state.game.ui;
+      if (!ui || ui.mode !== "VOL_TYPE") return;
+      state.game.ui = { mode: "VOL_CONSENT", actor: ui.actor, target: ui.target, type };
+      render();
+    }
+    function volunteerConsent(agree) {
+      const ui = state.game.ui;
+      if (!ui || ui.mode !== "VOL_CONSENT") return;
+      const actor = findPlayer(ui.actor);
+      const target = findPlayer(ui.target);
+      if (agree) {
+        add(target, "stamina", 1);
+        if (ui.type === "photo") add(target, "curiosity", 1);
+        actor.counters.help_types = actor.counters.help_types || [];
+        if (!actor.counters.help_types.includes(ui.type)) actor.counters.help_types.push(ui.type);
+        add(actor, "progress", 1);
+        pushLog(`[VOL] ${actor.name} helped ${target.name} (${ui.type}).`);
+      } else {
+        pushLog(`[VOL] ${target.name} declined help.`);
+      }
+      advanceTurn();
+      render();
+    }
+
+    function resolveAction(action, payload = {}) {
+      if (!state.game || state.game.gameOver) return;
+      if (action === "request_draw") return requestDraw();
+      if (action === "choose_draw_cost") return chooseDrawCost(payload.index);
+      if (action === "use_skill") return useSkill();
+      if (action === "skip_turn") { pushLog("[TURN] Skip skill/draw."); advanceTurn(); render(); return; }
+
+      if (action === "finn_target") return finnChooseTarget(payload.targetId);
+      if (action === "finn_consent") return finnConsent(payload.agree);
+      if (action === "photo_target") return photoChooseTarget(payload.targetId);
+      if (action === "photo_consent") return photoConsent(payload.agree);
+      if (action === "trade_item") return tradeChooseItem(payload.index);
+      if (action === "trade_partner") return tradeChoosePartner(payload.partnerId);
+      if (action === "trade_consent") return tradeConsent(payload.agree);
+      if (action === "food_decide") return foodDecide(payload.accept);
+      if (action === "perform_watch") return performWatch(payload.watch);
+      if (action === "perform_benefit") return performBenefit(payload.choice);
+      if (action === "vol_target") return volunteerChooseTarget(payload.targetId);
+      if (action === "vol_type") return volunteerChooseType(payload.type);
+      if (action === "vol_consent") return volunteerConsent(payload.agree);
+    }
+
+    function autoDecision() {
+      if (!state.game || state.game.gameOver) return null;
+      const ui = state.game.ui || { mode: "TURN_CHOICE" };
+      const p = currentPlayer();
+      if (ui.mode === "TURN_CHOICE") {
+        const drawLikely = canAnyDrawCost(p);
+        return drawLikely ? { action: "request_draw" } : { action: "use_skill" };
+      }
+      if (ui.mode === "DRAW_COST_CHOICE") return { action: "choose_draw_cost", payload: { index: 0 } };
+      if (ui.mode === "FINN_TARGET") return { action: "finn_target", payload: { targetId: ui.targets[0] } };
+      if (ui.mode === "FINN_CONSENT") return { action: "finn_consent", payload: { agree: false } };
+      if (ui.mode === "PHOTO_TARGET") return { action: "photo_target", payload: { targetId: ui.targets[0] } };
+      if (ui.mode === "PHOTO_CONSENT") return { action: "photo_consent", payload: { agree: false } };
+      if (ui.mode === "TRADE_ITEM") return { action: "trade_item", payload: { index: 0 } };
+      if (ui.mode === "TRADE_PARTNER") return { action: "trade_partner", payload: { partnerId: ui.partners[0] } };
+      if (ui.mode === "TRADE_CONSENT") return { action: "trade_consent", payload: { agree: false } };
+      if (ui.mode === "FOOD_DECIDE") return { action: "food_decide", payload: { accept: true } };
+      if (ui.mode === "PERFORM_WATCH") return { action: "perform_watch", payload: { watch: true } };
+      if (ui.mode === "PERFORM_BENEFIT") return { action: "perform_benefit", payload: { choice: "stamina" } };
+      if (ui.mode === "VOL_TARGET") return { action: "vol_target", payload: { targetId: ui.targets[0] } };
+      if (ui.mode === "VOL_TYPE") return { action: "vol_type", payload: { type: ui.helpTypes[0] } };
+      if (ui.mode === "VOL_CONSENT") return { action: "vol_consent", payload: { agree: true } };
+      return { action: "skip_turn" };
+    }
+
+    function canAnyDrawCost(player) {
+      const cfg = getRoleDef(player.roleId).drawCost;
+      return cfg.options.some((costs) => canPay(player, costs));
+    }
+
+    function renderMeta() {
+      dom.meta.innerHTML = "";
+      if (!state.game) return;
+      const p = currentPlayer();
+      const info = [
+        `Round ${state.game.round}`,
+        `当前 ${p ? p.name : "-"}`,
+        `剩余事件 ${state.game.deck.length}`,
+        state.mode === "auto" ? "自动模式" : "手动模式",
+      ];
+      if (state.game.lastDrawCost) info.push(`抽卡支付 ${state.game.lastDrawCost}`);
+      info.forEach((t) => {
+        const el = document.createElement("span");
+        el.className = "pill";
+        el.textContent = t;
+        dom.meta.appendChild(el);
+      });
+    }
+
+    function renderBoardRoles() {
+      dom.board.querySelectorAll(".role").forEach((el) => el.remove());
+      if (!state.game) return;
+      const players = state.game.players;
+      const rect = dom.board.getBoundingClientRect();
+      const cx = rect.width / 2;
+      const cy = rect.height / 2;
+      const cardHalfW = window.innerWidth < 760 ? 90 : 110;
+      const cardHalfH = 86;
+      const rx = Math.max(180, (rect.width / 2) - (cardHalfW + 26));
+      const ry = Math.max(170, (rect.height / 2) - (cardHalfH + 22));
+      const currentId = currentPlayer()?.roleId;
+      players.forEach((p, i) => {
+        const ang = -Math.PI / 2 + (2 * Math.PI * i / players.length);
+        const x = cx + rx * Math.cos(ang);
+        const y = cy + ry * Math.sin(ang);
+        const def = getRoleDef(p.roleId);
+        const stats = RES_ORDER
+          .map((k) => `<div>${RES_LABEL[k] || k} ${p.status[k] || 0}</div>`)
+          .join("");
+        const card = document.createElement("article");
+        card.className = `role${p.roleId === currentId ? " current" : ""}`;
+        card.style.left = `${x}px`;
+        card.style.top = `${y}px`;
+        card.innerHTML = `
+          <div class="name">${p.name}</div>
+          <div class="id">${p.roleId}</div>
+          <div class="stats">${stats}</div>
+          <div class="mini">技能: ${def.skillName}</div>
+          <div class="mini">抽卡: ${def.drawCost.logic} / ${def.drawCost.options.map((o) => formatCosts(o)).join(" | ")}</div>
+          <div class="mini">胜利: ${def.winDesc}</div>
+          ${p.win ? '<div class="mini win">已达成胜利</div>' : ""}
+        `;
+        dom.board.appendChild(card);
+      });
+    }
+
+    function addAction(label, action, payload = {}, cls = "") {
+      const b = document.createElement("button");
+      b.textContent = label;
+      if (cls) b.className = cls;
+      b.onclick = () => resolveAction(action, payload);
+      dom.actions.appendChild(b);
+    }
+
+    function renderCenter() {
+      dom.actions.innerHTML = "";
+      if (!state.game) {
+        dom.centerTitle.textContent = "等待开局";
+        dom.centerHint.textContent = "请选择角色并开始。";
+        return;
+      }
+      if (state.game.gameOver) {
+        dom.centerTitle.textContent = "游戏结束";
+        dom.centerHint.textContent = `赢家: ${state.game.winners.map(roleName).join(", ")}`;
+        return;
+      }
+      const p = currentPlayer();
+      const ui = state.game.ui || { mode: "TURN_CHOICE" };
+      const eventName = state.game.currentEvent ? state.game.currentEvent.name : "无事件";
+      dom.centerTitle.textContent = `${p.name} 的回合`;
+      dom.centerHint.textContent = `阶段: ${ui.mode} | 当前事件: ${eventName}`;
+
+      if (ui.mode === "TURN_CHOICE") {
+        addAction("抽卡", "request_draw", {}, "primary");
+        addAction("使用技能", "use_skill", {}, "secondary");
+        return;
+      }
+      if (ui.mode === "DRAW_COST_CHOICE") {
+        ui.options.forEach((c, idx) => addAction(`支付 ${formatCosts(c)}`, "choose_draw_cost", { index: idx }, "secondary"));
+        return;
+      }
+      if (ui.mode === "FINN_TARGET") {
+        ui.targets.forEach((id) => addAction(`请求 ${roleName(id)}`, "finn_target", { targetId: id }, "secondary"));
+        return;
+      }
+      if (ui.mode === "FINN_CONSENT") {
+        addAction(`${roleName(ui.target)} 同意`, "finn_consent", { agree: true }, "secondary");
+        addAction(`${roleName(ui.target)} 拒绝`, "finn_consent", { agree: false });
+        return;
+      }
+      if (ui.mode === "PHOTO_TARGET") {
+        ui.targets.forEach((id) => addAction(`拍 ${roleName(id)}`, "photo_target", { targetId: id }, "secondary"));
+        return;
+      }
+      if (ui.mode === "PHOTO_CONSENT") {
+        addAction(`${roleName(ui.target)} 同意`, "photo_consent", { agree: true }, "secondary");
+        addAction(`${roleName(ui.target)} 拒绝`, "photo_consent", { agree: false });
+        return;
+      }
+      if (ui.mode === "TRADE_ITEM") {
+        ui.items.forEach((it, idx) => addAction(`卖 ${it.label}`, "trade_item", { index: idx }, "secondary"));
+        return;
+      }
+      if (ui.mode === "TRADE_PARTNER") {
+        ui.partners.forEach((id) => addAction(`卖给 ${roleName(id)}`, "trade_partner", { partnerId: id }, "secondary"));
+        return;
+      }
+      if (ui.mode === "TRADE_CONSENT") {
+        addAction(`${roleName(ui.partner)} 同意`, "trade_consent", { agree: true }, "secondary");
+        addAction(`${roleName(ui.partner)} 拒绝`, "trade_consent", { agree: false });
+        return;
+      }
+      if (ui.mode === "FOOD_DECIDE") {
+        addAction(`${roleName(ui.queue[0])} 购买`, "food_decide", { accept: true }, "secondary");
+        addAction(`${roleName(ui.queue[0])} 跳过`, "food_decide", { accept: false });
+        return;
+      }
+      if (ui.mode === "PERFORM_WATCH") {
+        addAction(`${roleName(ui.current)} 围观`, "perform_watch", { watch: true }, "secondary");
+        addAction(`${roleName(ui.current)} 不围观`, "perform_watch", { watch: false });
+        return;
+      }
+      if (ui.mode === "PERFORM_BENEFIT") {
+        addAction("收益: +1体力 -1好奇心", "perform_benefit", { choice: "stamina" });
+        addAction("收益: -1金钱 +1好奇心", "perform_benefit", { choice: "money" }, "secondary");
+        return;
+      }
+      if (ui.mode === "VOL_TARGET") {
+        ui.targets.forEach((id) => addAction(`帮助 ${roleName(id)}`, "vol_target", { targetId: id }, "secondary"));
+        return;
+      }
+      if (ui.mode === "VOL_TYPE") {
+        ui.helpTypes.forEach((t) => addAction(`帮助类型 ${t}`, "vol_type", { type: t }, "secondary"));
+        return;
+      }
+      if (ui.mode === "VOL_CONSENT") {
+        addAction(`${roleName(ui.target)} 接受`, "vol_consent", { agree: true }, "secondary");
+        addAction(`${roleName(ui.target)} 拒绝`, "vol_consent", { agree: false });
+      }
+    }
+
+    function renderLogs() {
+      if (!state.game) {
+        dom.logs.textContent = "准备开始...";
+        return;
+      }
+      dom.logs.textContent = state.game.logs.join("\n");
+      dom.logs.scrollTop = dom.logs.scrollHeight;
+    }
+
+    function render() {
+      renderMeta();
+      renderCenter();
+      renderBoardRoles();
+      renderLogs();
+      const started = !!state.game;
+      dom.setup.style.display = started ? "none" : "block";
+      dom.layout.classList.toggle("playing", started);
+    }
+
+    function setMode(mode) {
+      state.mode = mode;
+      dom.manualBtn.className = mode === "manual" ? "secondary" : "";
+      dom.autoBtn.className = mode === "auto" ? "secondary" : "";
+      if (state.autoTimer) {
+        clearInterval(state.autoTimer);
+        state.autoTimer = null;
+      }
+      if (mode === "auto") {
+        state.autoTimer = setInterval(() => {
+          if (state.busy || !state.game || state.game.gameOver) return;
+          const d = autoDecision();
+          if (!d) return;
+          state.busy = true;
+          try { resolveAction(d.action, d.payload || {}); } finally { state.busy = false; }
+        }, 650);
+      }
+      renderMeta();
+    }
+
+    dom.startBtn.onclick = () => {
+      const ids = [...dom.setupRoles.querySelectorAll("input:checked")].map((x) => x.value);
+      if (ids.length < 2 || ids.length > 6) {
+        alert("请选择 2-6 个角色");
+        return;
+      }
+      startGame(ids);
+    };
+    dom.resetBtn.onclick = () => {
+      state.game = null;
+      setMode("manual");
+      render();
+    };
+    dom.manualBtn.onclick = () => setMode("manual");
+    dom.autoBtn.onclick = () => setMode("auto");
+    dom.stepBtn.onclick = () => {
+      if (!state.game || state.game.gameOver) return;
+      const d = autoDecision();
+      if (d) resolveAction(d.action, d.payload || {});
+    };
+
+    window.addEventListener("resize", renderBoardRoles);
+    initSetup();
+    setMode("manual");
+    render();
+  </script>
+</body>
+</html>
