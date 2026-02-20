@@ -1,0 +1,199 @@
+# Role Manual (Current Build)
+
+## Global Rules
+- Turn choice: `Draw` or `Use Skill`.
+- Event cards are unique draw: each card is drawn once from deck.
+- Finn purchase restriction:
+  - Finn cannot buy anything by default (trade/food).
+  - Volunteer help on Finn grants `1` assisted-buy chance.
+  - Each successful Finn purchase consumes `1` assisted-buy chance.
+- Finn photo rule:
+  - Finn cannot refuse being photographed.
+  - Same tourist can photograph Finn at most once.
+- Photo reward:
+  - Target of photo gains `+1 product` (photo item).
+- Performance watcher reward:
+  - Watcher gains `+1 curiosity`.
+  - If watcher has orange item, watcher may also wear `1` orange item.
+
+---
+
+## 1) Finn
+- Initial: `🔍2 💰0 ❤️3 📦0 👑0 🤴🏻0`
+- Draw cost: `THEN / stamina-1 | curiosity-1` (auto takes first payable option).
+- Skill: ask one player with orange item; if accepted, Finn wears `+1` orange and gains `⭐️+1`.
+- Win: wear `3` orange items (`🤴🏻 >= 3`).
+
+## 2) Tourist
+- Initial: `🔍2 💰6 ❤️4 📦1 👑0 🤴🏻0`
+- Draw cost: `OR / money-1 | curiosity-1`
+- Skill: choose target and request photo consent (Finn is forced-consent).
+  - On shoot: tourist pays `💰-1 ❤️-1`, target gets `📦+1`.
+  - Valid photo only if target is wearing orange (`🤴🏻 > 0`), then tourist gains `⭐️+1`.
+- Win: `5` valid photos (same tourist can photo Finn only once).
+
+## 3) Vendor
+- Initial: `🔍2 💰0 ❤️6 📦2 👑1 🤴🏻0`
+- Draw cost: `THEN / stamina-1 | money-1`
+- Skill: sell one item to one buyer (buyer may accept/refuse).
+  - Normal item base price: `1`
+  - Orange item base price: `2`
+  - Event effect may add orange price bonus.
+- Win: `3` valid trades.
+
+## 4) Food Vendor
+- Initial: `🔍3 💰0 ❤️1 📦0 👑0 🤴🏻0`
+- Draw cost: `THEN / curiosity-1`
+- Skill: start food offering to all players (including self), one by one.
+  - Start requirement: `❤️ >= 2`
+  - Buyer condition: `🔍 >= 2` and can pay `💰1` (self does not pay).
+  - Buyer effect: `❤️ +1` (may be multiplied by event effect).
+  - End-of-offer stamina cost:
+    - no buyer: `❤️ -1`
+    - >=1 buyer: `❤️ -2`
+    - may be multiplied by event effect.
+- Win: `5` successful servings total.
+  - Self-serving is counted at most once.
+
+## 5) Performer
+- Initial: `🔍2 💰1 ❤️6 📦0 👑1 🤴🏻1`
+- Draw cost: `THEN / money-1 | stamina-1`
+- Skill: requires wearing orange (`🤴🏻 >= 1`) before start.
+  - Ask players to watch.
+  - Each watcher gains `🔍+1`, and may wear orange if available.
+  - Success threshold: `>=2` watchers (unless event overrides to `1`).
+  - Success: performer `❤️-2`, `⭐️+1`.
+  - Fail: performer `❤️-1`.
+- Win: `3` successful performances.
+
+## 6) Volunteer
+- Initial: `🔍2 💰5 ❤️2 📦1 👑0 🤴🏻0`
+- Draw cost: `OR / stamina-2 | stamina-1 + curiosity-1`
+- Skill: choose target + help type; target may accept/refuse.
+  - On accept: target `❤️+1`; if type is `photo`, target `🔍+1`.
+  - Volunteer gains `⭐️+1`.
+  - If target is Finn: Finn gains `1` assisted-buy chance.
+- Win: `3` successful helps.
+
+---
+
+## Events (Cards 1-12)
+
+## Card 1: Orange Crown
+- Global: Drawer gains `👑+1`.
+- Finn: wear it at no cost.
+- Vendor: orange item stall price `+2` (stackable).
+- Tourist: gift to anyone, then attempt photo.
+  - For this card, if gifting to Finn, Finn auto-wears.
+- Food Vendor: if already wearing orange, future food cost `x2` and food effect `x2`.
+- Performer: wear it, then immediate perform; success threshold becomes `1` audience for that perform.
+
+## Card 2: DOESN'T FIT RIGHT
+- Global: `Targets` are all players with lowest `🔍` (including drawer).
+  - Each target gains `🔍+1`.
+  - Drawer gains extra `🔍+1` (can stack to `+2` if also a target).
+- Finn: if wearing orange, gain `👑+1`.
+- Vendor: trade with each non-self target (cannot refuse).
+- Food Vendor: supply each non-self target (no refusal).
+- Performer: if player count > 1, gain `⭐️+1`; else start performance.
+- Tourist: photo each non-self target.
+  - If target has orange (worn/held) or target is Finn: cannot refuse.
+  - Otherwise ask consent one by one.
+
+## Card 3: Orange scarf
+- Global: Drawer gains `👑+1`.
+- Finn: wear it at no cost.
+- Vendor: keep it in stall (inventory).
+- Food Vendor: gift to any player, then gain `❤️+1`.
+- Tourist: gift to any player, then photo.
+  - For this card, gifting to Finn does not auto-wear.
+- Performer:
+  - If not wearing, wear it.
+  - If already wearing, start perform with `1` audience requirement.
+
+## Card 4: All IN Orange
+- Global (all): all players gain `🔍+1`.
+- Baseline role effect: drawer gains `👑+1`.
+- Tourist: attempt a photo.
+- Food Vendor: start supply now, this supply grants fixed `❤️+1` effect.
+- Vendor: all trade prices `x2` (stackable).
+- Performer: start performance now.
+  - If already wearing orange, gain `⭐️+1` regardless of performance outcome.
+
+## Card 5: TOO CROWDED
+- Global (drawer only): `❤️-1, 🔍+1`.
+- Finn: spend `1❤️` -> `👑+1`.
+- Tourist: spend `1🔍` -> `❤️+1`.
+- Food Vendor: supply now with no stamina cost.
+- Vendor: choose one:
+  - Wear an orange item.
+  - Start trade (`📦` price `*2` for this trade flow).
+  - Start trade (`👑` cannot be refused).
+- Performer: perform now.
+  - If wearing orange, success threshold is `1` audience; else normal threshold.
+
+## Card 6: Pop-up Stall
+- Global (drawer only): gain `📦+1`.
+- Finn: choose a target with `👑`, force swap `1📦 -> 1👑` (cannot refuse).
+- Vendor: start trade, `📦` only, cannot refuse.
+- Tourist: spend `1📦` -> `🔍+1`.
+- Food Vendor: spend `1📦` -> `❤️+1`.
+- Performer: spend `1📦` -> `👑+1`.
+
+## Card 7: quick Swap
+- Global: choose another player as target.
+- Finn: if `🔍>=6`, swap any one own item (`📦` or `👑`) for `1👑` from target (cannot refuse).
+- Food Vendor: offer swap `1📦` for `1👑`; if refused, gain `💰+1`.
+- Vendor: offer swap `1📦` for `1👑`; if refused, gain `💰+1`.
+- Performer: swap any one item with target (both must have at least one item), then gain `❤️+2`.
+- Tourist: offer swap `1📦` for `1👑`; if refused, may attempt a photo on that target.
+
+## Card 8: LOOKS INTERESTING
+- Global: choose `1` target player, target gains `🔍+1`.
+- Finn: if `🔍>=6`, swap one own item (`📦` or `👑`) for target `1👑` (cannot refuse).
+- Performer: if target has both `👑` and `🤴🏻`, start performance immediately.
+  - Target must join as watcher.
+  - No stamina cost for this performance.
+- Tourist: photo the target (cannot refuse).
+- Vendor: trade with target (cannot refuse).
+- Food Vendor: supply target (cannot refuse); if successful, gain `⭐️+1`.
+
+## Card 9: IMPROVISED PERFORMANCE
+- Global (all): each player chooses whether to Watch.
+  - Each watcher gains `❤️+2`.
+- Finn: if Finn watched, gain `👑+1`.
+- Performer: start a performance.
+  - If watching crowd has `2+` players, use that crowd directly for this performance.
+- Tourist: attempt one photo of the watching crowd, and record `1` photo success when completed.
+- Vendor: trade with the watching crowd.
+- Food Vendor: supply to the watching crowd.
+
+## Card 10: JOIN THE ACT?
+- Global (drawer only): gain `🔍+1`.
+- Finn: gain `👑+1` and `❤️+1`.
+- Performer: start a performance now, with no stamina cost.
+- Tourist: attempt `1` photo; if refused, gain `🔍+2`.
+- Food Vendor: wear `1` orange item if available.
+- Vendor: wear `1` orange item if available.
+
+## Card 11: NONSTOP APPLAUSE
+- Global (drawer only): gain `❤️+1` and `🔍+1`.
+- Finn: gain `👑+1` and `❤️+1`.
+- Performer: start a performance, and gain `+1` performance success immediately.
+- Tourist: attempt `1` photo of the performer.
+  - If performer has no `📦`, performer cannot refuse this photo.
+- Vendor: start a trade.
+  - If vendor has or is wearing orange item, this trade flow uses `price x2`.
+- Food Vendor: start a supply.
+  - If food vendor has or is wearing orange item, this supply uses `food price x2`.
+
+## Card 12: PULLED ON STAGE
+- Global: choose `1` target player, target gains `📦+1`.
+- Finn: ask target to help Finn wear `1` orange item (if Finn has orange item).
+- Performer: start a performance; target must watch.
+- Tourist: attempt `1` photo of target.
+  - If refused, target `❤️-1`.
+- Vendor: trade with target.
+  - If refused, target `❤️-1`.
+- Food Vendor: start supply to target.
+  - If refused, food vendor `❤️+2`, and target `❤️-1`.
