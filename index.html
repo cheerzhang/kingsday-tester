@@ -613,8 +613,10 @@
               actor: actor.roleId,
               targets: g.players.map((p) => p.roleId),
               autoWearFinn: false,
+              autoWearTarget: true,
+              forcePhotoAfterGift: true,
             };
-            pushLog("[EVENT] Tourist: Give to any player, then Photo.");
+            pushLog("[EVENT] Tourist: Give to any player, wear it for target, then Photo (cannot refuse).");
             return true;
           }
 
@@ -698,14 +700,13 @@
           }
 
           if (actor.roleId === "role_tourist") {
-            if ((actor.status.curiosity || 0) >= 1) {
-              add(actor, "curiosity", -1);
-              add(actor, "stamina", 1);
-              pushLog("[EVENT] Tourist: spend 1🔍 -> ❤️+1.");
-            } else {
-              pushLog("[EVENT] Tourist: not enough 🔍 to spend.");
+            if ((actor.status.product || 0) < 2) {
+              pushLog("[EVENT] Tourist: not enough 📦 to pay (need 2).");
+              return false;
             }
-            return false;
+            add(actor, "product", -2);
+            pushLog("[EVENT] Tourist: spend 2📦 -> attempt a Photo.");
+            return startTouristSkill(actor) || true;
           }
 
           if (actor.roleId === "role_food_vendor") {
@@ -770,8 +771,8 @@
           if (actor.roleId === "role_food_vendor") {
             if ((actor.status.product || 0) >= 1) {
               add(actor, "product", -1);
-              add(actor, "stamina", 1);
-              pushLog("[EVENT] Food Vendor: spend 1📦 -> ❤️+1.");
+              add(actor, "money", 1);
+              pushLog("[EVENT] Food Vendor: spend 1📦 -> 💰+1.");
             } else {
               pushLog("[EVENT] Food Vendor: no 📦 to spend.");
             }
@@ -1009,9 +1010,19 @@
           }
 
           if (actor.roleId === "role_vendor") {
-            add(actor, "product", 1);
-            pushLog("[EVENT] Vendor: get 📦+1.");
-            return false;
+            const tourist = findPlayer("role_tourist");
+            if (!tourist) {
+              pushLog("[EVENT] Vendor: no tourist in game, cannot sell.");
+              return false;
+            }
+            const items = vendorItems(actor);
+            if (!items.length) {
+              pushLog("[EVENT] Vendor: no item to sell.");
+              return false;
+            }
+            g.ui = { mode: "EVENT_CARD16_VENDOR_ITEM", actor: actor.roleId, target: tourist.roleId, items };
+            pushLog("[EVENT] Vendor: choose an item to sell to Tourist (cannot refuse).");
+            return true;
           }
 
           if (actor.roleId === "role_performer") {
@@ -1198,7 +1209,7 @@
           role_finn: "Wear it at no cost.",
           role_vendor: "Add it to your stall.",
           role_food_vendor: "Gift to any player,\nyour ❤️ +1.",
-          role_tourist: "Give to any player,\nThen Photo.",
+          role_tourist: "Give to any player and wear it for target,\nThen Photo (can't refuse).",
           role_performer: "If not wearing → Wear it.\nAlready wearing → Perform (1 Audience required).",
           role_volunteer: "No extra role effect.",
         },
@@ -1218,7 +1229,7 @@
         global: "Drawer only: ❤️-1, 🔍+1.",
         selfByRole: {
           role_finn: "Spend 1 ❤️ → 👑 +1.",
-          role_tourist: "Spend 1 🔍 → ❤️ +1.",
+          role_tourist: "Pay 2 📦,\nthen attempt a Photo.",
           role_food_vendor: "Supply now (no ❤️ cost).",
           role_vendor: "Choose 1:\nWear an orange item.\nStart a trade (📦 cost *2)\nStart a trade (👑 cannot be refused)",
           role_performer: "Perform now.\n1 Audience needed only if you wear the orange.",
@@ -1231,7 +1242,7 @@
           role_finn: "Trade 1 📦 with any player (Cannot refuse)\nfor 1 👑 Item.",
           role_vendor: "Start a Trade.\n📦 only.\nCannot refuse.",
           role_tourist: "Spend 1 📦 → 🔍 +1.",
-          role_food_vendor: "Spend 1 📦 → ❤️ +1.",
+          role_food_vendor: "Spend 1 📦 → 💰 +1.",
           role_performer: "Spend 1 📦 → 👑 +1.",
           role_volunteer: "No extra role effect.",
         },
@@ -1241,8 +1252,8 @@
         selfByRole: {
           role_finn: "If 🔍 ≥6:\nSwap any Item with the target for 1 👑\n(Cannot refuse.)",
           role_tourist: "Swap 1 📦 for 1 👑 with the target.\nIf refused you can attempt to take a photo.",
-          role_vendor: "Swap 📦 for 1 👑 with the target.\nIf refused → you gain 💰 +1.",
-          role_food_vendor: "Swap 📦 for 1 👑 with the target.\nIf refused → you gain 💰 +1.",
+          role_vendor: "Swap 📦 for 1 👑 with the target.\nIf refused, target pays you 💰+1.\nIf target can't pay, target can't refuse.",
+          role_food_vendor: "Swap 📦 for 1 👑 with the target.\nIf refused, target pays you 💰+1.\nIf target can't pay, target can't refuse.",
           role_performer: "Swap any item with the target.\nYou gain ❤️+2.",
           role_volunteer: "No extra role effect.",
         },
@@ -1328,7 +1339,7 @@
         global: "Choose another player as Target. Target gains 🔍+2.",
         selfByRole: {
           role_finn: "Choose 1:\n1) Get 1 📦\n2) Wear 1 orange item",
-          role_food_vendor: "Provide 1 Food to the Target.\nTarget pays 1 👑 if target has it.",
+          role_food_vendor: "Provide 1 Food to the Target.\nIf target has unworn 👑, can't refuse.\nFood Vendor gains ⭐+1.\nTarget pays 1 👑 if target has it.",
           role_vendor: "Swap with the Target.\nTarget can't refuse.",
           role_performer: "Choose 1:\n1) Get 1 📦\n2) Swap with the Target (can't refuse)",
           role_tourist: "Take 1 Photo of the Target.\nTarget can't refuse, but target gets 💰+2.",
@@ -1340,7 +1351,7 @@
         selfByRole: {
           role_finn: "Choose 1:\n1) Get 1 orange item\n2) Wear 1 orange item",
           role_food_vendor: "Supply now.\nFood this round ❤️+2.",
-          role_vendor: "Get 📦+1.",
+          role_vendor: "Sell an item to Tourist.\nTourist can't refuse.",
           role_performer: "Get ❤️+2.",
           role_tourist: "Take 1 photo.\nCan't be refused.\nTarget gets 1 📦.",
           role_volunteer: "No extra role effect.",
@@ -1380,12 +1391,12 @@
         },
       },
       card_20: {
-        global: "Choose another player as Target. Target and you gain 👑+1.",
+        global: "All players gain 💰+1. Finn gains ❤️+1.",
         selfByRole: {
           role_finn: "Wear 1 orange with no cost.",
           role_food_vendor: "Start a swap, target can't refuse.",
           role_performer: "Choose 1:\n1) Pay 👑-1, 📦+1\n2) Pay 👑-1, ❤️+1",
-          role_vendor: "Trade to target.\nTarget can't refuse.\nTarget pays 👑-1.",
+          role_vendor: "Trade to target.\nTarget can't refuse.\nTarget pays 👑-1 to you.",
           role_tourist: "Ask target wear 1 orange item and take 1 photo.\nCan't be refused.",
           role_volunteer: "No extra role effect.",
         },
@@ -1420,6 +1431,12 @@
 
     function add(player, key, delta) {
       player.status[key] = Math.max(0, (player.status[key] || 0) + delta);
+      // Finn's progress is always equal to currently worn orange items.
+      if (player.roleId === "role_finn") {
+        const worn = player.status.orange_wear_product || 0;
+        player.status.progress = worn;
+        player.counters.orange_worn = worn;
+      }
     }
     function isFinn(player) {
       return player && player.roleId === "role_finn";
@@ -2036,7 +2053,9 @@
         state.game.ui.mode = "PERFORM_WATCH";
         state.game.ui.current = state.game.ui.queue[0];
       }
-      if (!filteredQueue.length) return finishPerform(state.game.ui);
+      if ((!state.game.ui.forcedQueue || !state.game.ui.forcedQueue.length) && !filteredQueue.length) {
+        return finishPerform(state.game.ui);
+      }
       render();
       return true;
     }
@@ -2111,14 +2130,31 @@
       const actor = findPlayer(ui.actor);
       const watcher = findPlayer(ui.current);
       if (!actor || !watcher) return;
-      const toggle = !!ui.toggleWear;
-      const paid = applyPerformWatchPay(actor, watcher, choice, toggle);
+      const paid = applyPerformWatchPay(actor, watcher, choice, false);
       if (!paid) {
         pushLog(`[PERFORM] ${watcher.name} cannot pay watch cost.`);
-      } else {
-        if (toggle) toggleOrangeWear(watcher);
-        ui.watchers.push(watcher.roleId);
+        ui.forcedQueue.shift();
+        if (ui.forcedQueue.length > 0) {
+          ui.current = ui.forcedQueue[0];
+          state.game.ui = { ...ui, mode: "PERFORM_FORCED_PAY" };
+          render();
+          return;
+        }
+        if (!ui.queue.length) return finishPerform(ui);
+        state.game.ui = { ...ui, mode: "PERFORM_WATCH", current: ui.queue[0] };
+        render();
+        return;
       }
+      state.game.ui = { ...ui, mode: "PERFORM_FORCED_TOGGLE", current: watcher.roleId };
+      render();
+    }
+    function performForcedToggle(toggle) {
+      const ui = state.game.ui;
+      if (!ui || ui.mode !== "PERFORM_FORCED_TOGGLE") return;
+      const watcher = findPlayer(ui.current);
+      if (!watcher) return;
+      if (toggle) toggleOrangeWear(watcher);
+      ui.watchers.push(watcher.roleId);
       ui.forcedQueue.shift();
       if (ui.forcedQueue.length > 0) {
         ui.current = ui.forcedQueue[0];
@@ -2149,6 +2185,7 @@
         render();
         return;
       }
+      // Step 1 after joining: pay first.
       state.game.ui = { ...ui, mode: "PERFORM_BENEFIT", toggleWear: false };
       render();
     }
@@ -2157,8 +2194,7 @@
       if (!ui || ui.mode !== "PERFORM_BENEFIT") return;
       const watcher = findPlayer(ui.current);
       const actor = findPlayer(ui.actor);
-      const toggle = !!ui.toggleWear;
-      const paid = applyPerformWatchPay(actor, watcher, choice, toggle);
+      const paid = applyPerformWatchPay(actor, watcher, choice, false);
       if (!paid) {
         pushLog("[PERFORM] Watcher cannot pay watch cost.");
         ui.queue.shift();
@@ -2167,6 +2203,15 @@
         render();
         return;
       }
+      // Step 2 after payment: choose whether to toggle wear state.
+      state.game.ui = { ...ui, mode: "PERFORM_TOGGLE", current: watcher.roleId };
+      render();
+    }
+    function performToggle(toggle) {
+      const ui = state.game.ui;
+      if (!ui || ui.mode !== "PERFORM_TOGGLE") return;
+      const watcher = findPlayer(ui.current);
+      if (!watcher) return;
       if (toggle) toggleOrangeWear(watcher);
       ui.watchers.push(watcher.roleId);
       ui.queue.shift();
@@ -2251,12 +2296,23 @@
       add(actor, "orange_product", -1);
       add(target, "orange_product", 1);
       pushLog(`[EVENT] ${actor.name} gifted an orange item to ${target.name}.`);
+      if (ui.autoWearTarget && target.status.orange_product > 0) {
+        add(target, "orange_product", -1);
+        add(target, "orange_wear_product", 1);
+        pushLog(`[EVENT] ${target.name} wears the gifted orange item now.`);
+      }
       if (ui.autoWearFinn && target.roleId === "role_finn" && target.status.orange_product > 0) {
         add(target, "orange_product", -1);
         add(target, "orange_wear_product", 1);
         add(target, "progress", 1);
         target.counters.orange_worn = (target.counters.orange_worn || 0) + 1;
         pushLog("[EVENT] Finn wears it at no cost now.");
+      }
+      if (ui.forcePhotoAfterGift) {
+        eventForcedPhoto(actor, target, true);
+        advanceTurn();
+        render();
+        return;
       }
       startTouristSkill(actor);
     }
@@ -2376,7 +2432,7 @@
           target: target.roleId,
           offerKey: "product",
           receiveKey: "orange_product",
-          onRefuse: "money",
+          onRefuse: "money_by_target",
         };
         render();
         return;
@@ -2466,6 +2522,27 @@
       if (ui.onRefuse === "money") {
         add(actor, "money", 1);
         pushLog(`[EVENT] Refused: ${actor.name} gains 💰+1.`);
+        advanceTurn();
+        render();
+        return;
+      }
+      if (ui.onRefuse === "money_by_target") {
+        if ((target.status.money || 0) >= 1) {
+          add(target, "money", -1);
+          add(actor, "money", 1);
+          pushLog(`[EVENT] Refused: ${target.name} pays ${actor.name} 💰1.`);
+        } else {
+          pushLog(`[EVENT] ${target.name} cannot refuse (not enough money to pay refusal cost).`);
+          if ((actor.status[ui.offerKey] || 0) >= 1 && (target.status[ui.receiveKey] || 0) >= 1) {
+            add(actor, ui.offerKey, -1);
+            add(target, ui.offerKey, 1);
+            add(target, ui.receiveKey, -1);
+            add(actor, ui.receiveKey, 1);
+            pushLog(`[EVENT] Swap forced: ${actor.name} traded 1 ${ui.offerKey} for 1 ${ui.receiveKey}.`);
+          } else {
+            pushLog("[EVENT] Swap failed (requirements).");
+          }
+        }
         advanceTurn();
         render();
         return;
@@ -3243,12 +3320,17 @@
           render();
           return;
         }
+        const canRefuse = (target.status.orange_wear_product || 0) > 0;
+        if (!canRefuse) {
+          pushLog(`[EVENT] ${target.name} is not wearing orange (no 🤴🏻), so cannot refuse this trade.`);
+        }
         state.game.ui = {
           mode: "EVENT_CARD14_VENDOR_ITEM",
           actor: actor.roleId,
           target: target.roleId,
           items,
-          forceNoRefuse: (target.status.orange_wear_product || 0) < 1,
+          canRefuse,
+          forceNoRefuse: !canRefuse,
         };
         render();
         return;
@@ -3267,6 +3349,7 @@
         actor: ui.actor,
         target: ui.target,
         item,
+        canRefuse: !!ui.canRefuse,
         forceNoRefuse: !!ui.forceNoRefuse,
       };
       render();
@@ -3282,16 +3365,12 @@
       if (agree) {
         const canTrade = (actor.status[ui.item.key] || 0) > 0
           && canParticipatePurchase(target)
-          && (finnAssistedBuy || target.status.money > ui.item.price)
-          && actor.status.stamina >= 1
-          && actor.status.curiosity >= 2
-          && target.status.curiosity >= 2;
+          && (finnAssistedBuy || target.status.money >= ui.item.price);
         if (canTrade) {
           add(actor, ui.item.key, -1);
           add(target, ui.item.key, 1);
           if (!finnAssistedBuy) add(target, "money", -ui.item.price);
           add(actor, "money", ui.item.price);
-          add(actor, "stamina", -1);
           add(actor, "progress", 1);
           if (finnAssistedBuy) consumeFinnBuyUnlock(target);
           actor.counters.trades = (actor.counters.trades || 0) + 1;
@@ -3337,25 +3416,43 @@
       }
 
       if (actor.roleId === "role_food_vendor") {
+        const targetHasUnwornOrange = (target.status.orange_product || 0) > 0;
+        if (targetHasUnwornOrange) {
+          pushLog(`[EVENT] ${target.name} has 👑, cannot refuse this supply.`);
+        }
         const effectMult = actor.counters.feed_effect_mult || 1;
         add(target, "stamina", 1 * effectMult);
-        if ((target.status.orange_product || 0) > 0) {
+        if (targetHasUnwornOrange) {
           add(target, "orange_product", -1);
           add(actor, "orange_product", 1);
           pushLog(`[EVENT] Food Vendor supplies ${target.name}; ${target.name} pays 1 👑.`);
         } else {
           pushLog(`[EVENT] Food Vendor supplies ${target.name}; target has no 👑 to pay.`);
         }
+        add(actor, "progress", 1);
         actor.counters.feed_servings = actor.counters.feed_servings || 0;
         actor.counters.feed_servings += 1;
+        pushLog("[EVENT] Food Vendor gains ⭐+1.");
         advanceTurn();
         render();
         return;
       }
 
       if (actor.roleId === "role_vendor") {
-        forcedSwapAny(actor, target, "Vendor");
-        advanceTurn();
+        const offerItems = itemChoicesForSwap(actor);
+        const receiveItems = itemChoicesForSwap(target);
+        if (!offerItems.length || !receiveItems.length) {
+          pushLog("[EVENT] Vendor swap failed (both need at least one swappable item).");
+          advanceTurn();
+          render();
+          return;
+        }
+        state.game.ui = {
+          mode: "EVENT_CARD15_VENDOR_SWAP_OFFER",
+          actor: actor.roleId,
+          target: target.roleId,
+          offerItems,
+        };
         render();
         return;
       }
@@ -3415,6 +3512,56 @@
       advanceTurn();
       render();
     }
+    function eventCard15VendorSwapOffer(offerKey) {
+      const ui = state.game.ui;
+      if (!ui || ui.mode !== "EVENT_CARD15_VENDOR_SWAP_OFFER") return;
+      const actor = findPlayer(ui.actor);
+      const target = findPlayer(ui.target);
+      if (!actor || !target) return;
+      const offerItems = itemChoicesForSwap(actor);
+      if (!offerItems.includes(offerKey)) {
+        pushLog("[EVENT] Vendor swap failed (invalid offered item).");
+        advanceTurn();
+        render();
+        return;
+      }
+      const receiveItems = itemChoicesForSwap(target);
+      if (!receiveItems.length) {
+        pushLog("[EVENT] Vendor swap failed (target has no swappable item).");
+        advanceTurn();
+        render();
+        return;
+      }
+      state.game.ui = {
+        mode: "EVENT_CARD15_VENDOR_SWAP_RECEIVE",
+        actor: actor.roleId,
+        target: target.roleId,
+        offerKey,
+        receiveItems,
+      };
+      render();
+    }
+    function eventCard15VendorSwapReceive(receiveKey) {
+      const ui = state.game.ui;
+      if (!ui || ui.mode !== "EVENT_CARD15_VENDOR_SWAP_RECEIVE") return;
+      const actor = findPlayer(ui.actor);
+      const target = findPlayer(ui.target);
+      if (!actor || !target) return;
+      const offerKey = ui.offerKey;
+      if ((actor.status[offerKey] || 0) < 1 || (target.status[receiveKey] || 0) < 1) {
+        pushLog("[EVENT] Vendor swap failed (requirements).");
+        advanceTurn();
+        render();
+        return;
+      }
+      add(actor, offerKey, -1);
+      add(target, offerKey, 1);
+      add(target, receiveKey, -1);
+      add(actor, receiveKey, 1);
+      pushLog(`[EVENT] Vendor swapped 1 ${offerKey} for 1 ${receiveKey} with ${target.name}. (cannot refuse)`);
+      advanceTurn();
+      render();
+    }
     function eventCard16FinnChoice(choice) {
       const ui = state.game.ui;
       if (!ui || ui.mode !== "EVENT_CARD16_FINN_CHOICE") return;
@@ -3444,6 +3591,33 @@
       const target = findPlayer(targetId);
       if (!actor || !target) return;
       eventForcedPhoto(actor, target, true);
+      advanceTurn();
+      render();
+    }
+    function eventCard16VendorItem(itemIndex) {
+      const ui = state.game.ui;
+      if (!ui || ui.mode !== "EVENT_CARD16_VENDOR_ITEM") return;
+      const actor = findPlayer(ui.actor);
+      const target = findPlayer(ui.target);
+      const item = ui.items[itemIndex];
+      if (!actor || !target || !item) return;
+      // Card #16 vendor rule: sell chosen item to Tourist, cannot refuse.
+      const canTrade = (actor.status[item.key] || 0) > 0
+        && canParticipatePurchase(target)
+        && (target.status.money || 0) >= item.price;
+      if (!canTrade) {
+        pushLog("[EVENT] Vendor sale failed (requirements).");
+        advanceTurn();
+        render();
+        return;
+      }
+      add(actor, item.key, -1);
+      add(target, item.key, 1);
+      add(target, "money", -item.price);
+      add(actor, "money", item.price);
+      add(actor, "progress", 1);
+      actor.counters.trades = (actor.counters.trades || 0) + 1;
+      pushLog(`[EVENT] Vendor sold ${item.label} to Tourist (cannot refuse).`);
       advanceTurn();
       render();
     }
@@ -3692,26 +3866,24 @@
       const target = findPlayer(ui.target);
       const item = ui.items[itemIndex];
       if (!actor || !target || !item) return;
-      const finnAssistedBuy = isFinn(target) && canFinnBuy(target);
+      // Card #19 vendor rule: target can't refuse; success requires target can pay ❤️-1.
       const canTrade = (actor.status[item.key] || 0) > 0
         && canParticipatePurchase(target)
-        && (finnAssistedBuy || target.status.money > item.price)
         && actor.status.stamina >= 1
         && actor.status.curiosity >= 2
-        && target.status.curiosity >= 2;
+        && target.status.curiosity >= 2
+        && target.status.stamina >= 1;
       if (!canTrade) {
-        pushLog("[EVENT] Vendor trade failed (requirements).");
+        pushLog("[EVENT] Vendor trade failed (requirements: item/stats/target ❤️>=1).");
         advanceTurn();
         render();
         return;
       }
       add(actor, item.key, -1);
       add(target, item.key, 1);
-      if (!finnAssistedBuy) add(target, "money", -item.price);
-      add(actor, "money", item.price);
+      // This card does not charge money; target pays stamina instead.
       add(actor, "stamina", -1);
       add(actor, "progress", 1);
-      if (finnAssistedBuy) consumeFinnBuyUnlock(target);
       actor.counters.trades = (actor.counters.trades || 0) + 1;
       add(target, "stamina", -1);
       pushLog(`[EVENT] Vendor traded ${item.label} with ${target.name} (cannot refuse). ${target.name} pays ❤️-1.`);
@@ -3725,9 +3897,10 @@
       const target = findPlayer(targetId);
       if (!actor || !target) return;
 
-      add(actor, "orange_product", 1);
-      add(target, "orange_product", 1);
-      pushLog(`[EVENT] ${actor.name} and ${target.name} gain 👑+1.`);
+      state.game.players.forEach((p) => add(p, "money", 1));
+      const finn = findPlayer("role_finn");
+      if (finn) add(finn, "stamina", 1);
+      pushLog("[EVENT] Global: all players gain 💰+1; Finn gains ❤️+1.");
 
       if (actor.roleId === "role_finn") {
         if ((actor.status.orange_product || 0) > 0) {
@@ -3745,8 +3918,20 @@
       }
 
       if (actor.roleId === "role_food_vendor") {
-        forcedSwapAny(actor, target, "Food Vendor");
-        advanceTurn();
+        const offerItems = itemChoicesForSwap(actor);
+        const receiveItems = itemChoicesForSwap(target);
+        if (!offerItems.length || !receiveItems.length) {
+          pushLog("[EVENT] Food Vendor swap failed (both need at least one swappable item).");
+          advanceTurn();
+          render();
+          return;
+        }
+        state.game.ui = {
+          mode: "EVENT_CARD20_FOOD_SWAP_OFFER",
+          actor: actor.roleId,
+          target: target.roleId,
+          offerItems,
+        };
         render();
         return;
       }
@@ -3816,29 +4001,76 @@
       const target = findPlayer(ui.target);
       const item = ui.items[itemIndex];
       if (!actor || !target || !item) return;
-      const finnAssistedBuy = isFinn(target) && canFinnBuy(target);
+      // Card #20 vendor rule: forced trade + target pays 1 orange to vendor.
       const canTrade = (actor.status[item.key] || 0) > 0
-        && canParticipatePurchase(target)
-        && (finnAssistedBuy || target.status.money > item.price)
+        && (target.status.orange_product || 0) > 0
         && actor.status.stamina >= 1
         && actor.status.curiosity >= 2
         && target.status.curiosity >= 2;
       if (!canTrade) {
-        pushLog("[EVENT] Vendor trade failed (requirements).");
+        pushLog("[EVENT] Vendor trade failed (requirements: item/👑/stats).");
         advanceTurn();
         render();
         return;
       }
       add(actor, item.key, -1);
       add(target, item.key, 1);
-      if (!finnAssistedBuy) add(target, "money", -item.price);
-      add(actor, "money", item.price);
       add(actor, "stamina", -1);
-      add(actor, "progress", 1);
-      if (finnAssistedBuy) consumeFinnBuyUnlock(target);
-      actor.counters.trades = (actor.counters.trades || 0) + 1;
       add(target, "orange_product", -1);
-      pushLog(`[EVENT] Vendor traded ${item.label} with ${target.name} (cannot refuse). ${target.name} pays 👑-1.`);
+      add(actor, "orange_product", 1);
+      add(actor, "progress", 1);
+      actor.counters.trades = (actor.counters.trades || 0) + 1;
+      pushLog(`[EVENT] Vendor traded ${item.label} with ${target.name} (cannot refuse). ${target.name} pays 👑-1 to ${actor.name}.`);
+      advanceTurn();
+      render();
+    }
+    function eventCard20FoodSwapOffer(offerKey) {
+      const ui = state.game.ui;
+      if (!ui || ui.mode !== "EVENT_CARD20_FOOD_SWAP_OFFER") return;
+      const actor = findPlayer(ui.actor);
+      const target = findPlayer(ui.target);
+      if (!actor || !target) return;
+      const offerItems = itemChoicesForSwap(actor);
+      if (!offerItems.includes(offerKey)) {
+        pushLog("[EVENT] Food Vendor swap failed (invalid offered item).");
+        advanceTurn();
+        render();
+        return;
+      }
+      const receiveItems = itemChoicesForSwap(target);
+      if (!receiveItems.length) {
+        pushLog("[EVENT] Food Vendor swap failed (target has no swappable item).");
+        advanceTurn();
+        render();
+        return;
+      }
+      state.game.ui = {
+        mode: "EVENT_CARD20_FOOD_SWAP_RECEIVE",
+        actor: actor.roleId,
+        target: target.roleId,
+        offerKey,
+        receiveItems,
+      };
+      render();
+    }
+    function eventCard20FoodSwapReceive(receiveKey) {
+      const ui = state.game.ui;
+      if (!ui || ui.mode !== "EVENT_CARD20_FOOD_SWAP_RECEIVE") return;
+      const actor = findPlayer(ui.actor);
+      const target = findPlayer(ui.target);
+      if (!actor || !target) return;
+      const offerKey = ui.offerKey;
+      if ((actor.status[offerKey] || 0) < 1 || (target.status[receiveKey] || 0) < 1) {
+        pushLog("[EVENT] Food Vendor swap failed (requirements).");
+        advanceTurn();
+        render();
+        return;
+      }
+      add(actor, offerKey, -1);
+      add(target, offerKey, 1);
+      add(target, receiveKey, -1);
+      add(actor, receiveKey, 1);
+      pushLog(`[EVENT] Food Vendor swapped 1 ${offerKey} for 1 ${receiveKey} with ${target.name}. (cannot refuse)`);
       advanceTurn();
       render();
     }
@@ -3860,9 +4092,11 @@
       if (action === "trade_consent") return tradeConsent(payload.agree);
       if (action === "food_decide") return foodDecide(payload.accept);
       if (action === "perform_forced_pay") return performForcedPay(payload.choice);
+      if (action === "perform_forced_toggle") return performForcedToggle(!!payload.toggle);
       if (action === "perform_toggle_wear") { state.game.ui = { ...state.game.ui, toggleWear: !!payload.toggle }; render(); return; }
       if (action === "perform_watch") return performWatch(payload.watch);
       if (action === "perform_benefit") return performBenefit(payload.choice);
+      if (action === "perform_toggle") return performToggle(!!payload.toggle);
       if (action === "vol_target") return volunteerChooseTarget(payload.targetId);
       if (action === "vol_type") return volunteerChooseType(payload.type);
       if (action === "vol_consent") return volunteerConsent(payload.agree);
@@ -3898,8 +4132,11 @@
       if (action === "event_card15_target") return eventCard15ChooseTarget(payload.targetId);
       if (action === "event_card15_finn_choice") return eventCard15FinnChoice(payload.choice);
       if (action === "event_card15_performer_choice") return eventCard15PerformerChoice(payload.choice);
+      if (action === "event_card15_vendor_swap_offer") return eventCard15VendorSwapOffer(payload.offerKey);
+      if (action === "event_card15_vendor_swap_receive") return eventCard15VendorSwapReceive(payload.receiveKey);
       if (action === "event_card16_finn_choice") return eventCard16FinnChoice(payload.choice);
       if (action === "event_card16_tourist_target") return eventCard16TouristTarget(payload.targetId);
+      if (action === "event_card16_vendor_item") return eventCard16VendorItem(payload.itemIndex);
       if (action === "event_card17_target") return eventCard17ChooseTarget(payload.targetId);
       if (action === "event_card17_vendor_item") return eventCard17VendorItem(payload.itemIndex);
       if (action === "event_card18_finn_choice") return eventCard18FinnChoice(payload.choice);
@@ -3909,6 +4146,8 @@
       if (action === "event_card20_target") return eventCard20ChooseTarget(payload.targetId);
       if (action === "event_card20_performer_choice") return eventCard20PerformerChoice(payload.choice);
       if (action === "event_card20_vendor_item") return eventCard20VendorItem(payload.itemIndex);
+      if (action === "event_card20_food_swap_offer") return eventCard20FoodSwapOffer(payload.offerKey);
+      if (action === "event_card20_food_swap_receive") return eventCard20FoodSwapReceive(payload.receiveKey);
     }
 
     function roleWinNeed(roleId) {
@@ -3922,7 +4161,7 @@
     }
     function roleWinProgress(player) {
       if (!player) return 0;
-      if (player.roleId === "role_finn") return Math.max(player.status.progress || 0, player.counters.orange_worn || 0);
+      if (player.roleId === "role_finn") return player.status.orange_wear_product || 0;
       if (player.roleId === "role_tourist") return Math.max(player.status.progress || 0, player.counters.photos || 0);
       if (player.roleId === "role_vendor") return Math.max(player.status.progress || 0, player.counters.trades || 0);
       if (player.roleId === "role_food_vendor") return Math.max(player.status.progress || 0, player.counters.feed_servings || 0);
@@ -4140,11 +4379,46 @@
     function strongAdversarialDecision(ui) {
       if (!AUTO_STRONG_ADVERSARIAL) return null;
       if (!ui) return null;
+      if (ui.mode === "EVENT_CARD9_WATCH_DECIDE") {
+        const actor = findPlayer(ui.actor);
+        const watcher = findPlayer((ui.queue || [])[0]);
+        if (!actor || !watcher) return { action: "event_card9_watch_decide", payload: { watch: false } };
+        // In strong-adversarial mode:
+        // - Only the drawer (actor) should usually join freely.
+        // - Other players avoid joining if it can increase drawer conversion/progress.
+        if (watcher.roleId === actor.roleId) return { action: "event_card9_watch_decide", payload: { watch: true } };
+        const actorCanExploitCrowd = actor.roleId === "role_vendor"
+          || actor.roleId === "role_food_vendor"
+          || actor.roleId === "role_performer"
+          || actor.roleId === "role_tourist";
+        if (actorCanExploitCrowd) return { action: "event_card9_watch_decide", payload: { watch: false } };
+        return { action: "event_card9_watch_decide", payload: { watch: true } };
+      }
+      if (ui.mode === "EVENT_CARD13_PARTICIPATE") {
+        const actor = findPlayer(ui.actor);
+        const decider = findPlayer((ui.queue || [])[0]);
+        if (!actor || !decider) return { action: "event_card13_participate", payload: { participate: false } };
+        // Drawer can always choose to join own event.
+        if (decider.roleId === actor.roleId) return { action: "event_card13_participate", payload: { participate: true } };
+        // Non-drawer should avoid being included in participant pool when it helps drawer role effect.
+        const actorBenefitsFromParticipants = actor.roleId === "role_vendor"
+          || actor.roleId === "role_food_vendor"
+          || actor.roleId === "role_performer"
+          || actor.roleId === "role_tourist";
+        if (actorBenefitsFromParticipants) return { action: "event_card13_participate", payload: { participate: false } };
+        return { action: "event_card13_participate", payload: { participate: true } };
+      }
       if (ui.mode === "FINN_CONSENT") return { action: "finn_consent", payload: { agree: false } };
       if (ui.mode === "PHOTO_CONSENT") return { action: "photo_consent", payload: { agree: false } };
       if (ui.mode === "TRADE_CONSENT") return { action: "trade_consent", payload: { agree: false } };
       if (ui.mode === "EVENT_CARD2_PHOTO_CONSENT") return { action: "event_card2_photo_consent", payload: { agree: false } };
-      if (ui.mode === "EVENT_CARD7_SWAP_CONSENT") return { action: "event_card7_swap_consent", payload: { agree: false } };
+      if (ui.mode === "EVENT_CARD7_SWAP_CONSENT") {
+        const target = findPlayer(ui.target);
+        if (ui.onRefuse === "money_by_target" && (target?.status?.money || 0) < 1) {
+          return { action: "event_card7_swap_consent", payload: { agree: true } };
+        }
+        return { action: "event_card7_swap_consent", payload: { agree: false } };
+      }
       if (ui.mode === "EVENT_CARD10_PHOTO_CONSENT") return { action: "event_card10_photo_consent", payload: { agree: false } };
       if (ui.mode === "EVENT_CARD11_TOURIST_CONSENT") return { action: "event_card11_tourist_consent", payload: { agree: false } };
       if (ui.mode === "EVENT_CARD12_FINN_CONSENT") return { action: "event_card12_finn_consent", payload: { agree: false } };
@@ -4248,10 +4522,11 @@
       if (ui.mode === "PHOTO_CONSENT") return { action: "photo_consent", payload: { agree: false } };
       if (ui.mode === "PERFORM_WATCH") return { action: "perform_watch", payload: { watch: Math.random() < TOURIST_AUTO_POLICY.watchRate } };
       if (ui.mode === "PERFORM_FORCED_PAY" || ui.mode === "PERFORM_BENEFIT") {
-        const canMoney = canPerformWatchPay(actor, "pay_money", !!ui.toggleWear);
+        const canMoney = canPerformWatchPay(actor, "pay_money", false);
         const payMoney = Math.random() < TOURIST_AUTO_POLICY.payMoneyRate;
         return { action: ui.mode === "PERFORM_FORCED_PAY" ? "perform_forced_pay" : "perform_benefit", payload: { choice: (payMoney && canMoney) ? "pay_money" : "pay_curiosity" } };
       }
+      if (ui.mode === "PERFORM_FORCED_TOGGLE" || ui.mode === "PERFORM_TOGGLE") return { action: ui.mode === "PERFORM_FORCED_TOGGLE" ? "perform_forced_toggle" : "perform_toggle", payload: { toggle: false } };
       if (ui.mode === "EVENT_CARD9_TOURIST_PHOTO_TARGET") return { action: "event_card9_tourist_photo_target", payload: { targetId: pickBestPhotoTarget(ui.targets) || ui.targets[0] } };
       if (ui.mode === "EVENT_CARD10_PHOTO_TARGET") return { action: "event_card10_photo_target", payload: { targetId: pickBestPhotoTarget(ui.targets) || ui.targets[0] } };
       if (ui.mode === "EVENT_CARD10_PHOTO_CONSENT") return { action: "event_card10_photo_consent", payload: { agree: false } };
@@ -4308,16 +4583,18 @@
       if (ui.mode === "TRADE_CONSENT") return { action: "trade_consent", payload: { agree: !(isThreatening(ui.actor, 1) && Math.random() < VENDOR_AUTO_POLICY.antiThreatRefuse) } };
       if (ui.mode === "PERFORM_WATCH") return { action: "perform_watch", payload: { watch: Math.random() < VENDOR_AUTO_POLICY.watchRate } };
       if (ui.mode === "PERFORM_FORCED_PAY" || ui.mode === "PERFORM_BENEFIT") {
-        const canMoney = canPerformWatchPay(actor, "pay_money", !!ui.toggleWear);
+        const canMoney = canPerformWatchPay(actor, "pay_money", false);
         const payMoney = Math.random() < VENDOR_AUTO_POLICY.payMoneyRate;
         return { action: ui.mode === "PERFORM_FORCED_PAY" ? "perform_forced_pay" : "perform_benefit", payload: { choice: (payMoney && canMoney) ? "pay_money" : "pay_curiosity" } };
       }
+      if (ui.mode === "PERFORM_FORCED_TOGGLE" || ui.mode === "PERFORM_TOGGLE") return { action: ui.mode === "PERFORM_FORCED_TOGGLE" ? "perform_forced_toggle" : "perform_toggle", payload: { toggle: false } };
       if (ui.mode === "EVENT_CARD7_TARGET") return { action: "event_card7_target", payload: { targetId: pickRoleTargetStrategic("role_vendor", ui.targets, VENDOR_AUTO_POLICY) || ui.targets[0] } };
       if (ui.mode === "EVENT_CARD8_TARGET") return { action: "event_card8_target", payload: { targetId: pickRoleTargetStrategic("role_vendor", ui.targets, VENDOR_AUTO_POLICY) || ui.targets[0] } };
       if (ui.mode === "EVENT_CARD12_TARGET") return { action: "event_card12_target", payload: { targetId: pickRoleTargetStrategic("role_vendor", ui.targets, VENDOR_AUTO_POLICY) || ui.targets[0] } };
       if (ui.mode === "EVENT_CARD13_TARGET") return { action: "event_card13_target", payload: { targetId: pickRoleTargetStrategic("role_vendor", ui.targets, VENDOR_AUTO_POLICY) || ui.targets[0] } };
       if (ui.mode === "EVENT_CARD14_TARGET") return { action: "event_card14_target", payload: { targetId: pickRoleTargetStrategic("role_vendor", ui.targets, VENDOR_AUTO_POLICY) || ui.targets[0] } };
       if (ui.mode === "EVENT_CARD15_TARGET") return { action: "event_card15_target", payload: { targetId: pickRoleTargetStrategic("role_vendor", ui.targets, VENDOR_AUTO_POLICY) || ui.targets[0] } };
+      if (ui.mode === "EVENT_CARD16_VENDOR_ITEM") return { action: "event_card16_vendor_item", payload: { itemIndex: 0 } };
       if (ui.mode === "EVENT_CARD17_TARGET") return { action: "event_card17_target", payload: { targetId: pickRoleTargetStrategic("role_vendor", ui.targets, VENDOR_AUTO_POLICY) || ui.targets[0] } };
       if (ui.mode === "EVENT_CARD19_TARGET") return { action: "event_card19_target", payload: { targetId: pickRoleTargetStrategic("role_vendor", ui.targets, VENDOR_AUTO_POLICY) || ui.targets[0] } };
       if (ui.mode === "EVENT_CARD20_TARGET") return { action: "event_card20_target", payload: { targetId: pickRoleTargetStrategic("role_vendor", ui.targets, VENDOR_AUTO_POLICY) || ui.targets[0] } };
@@ -4351,10 +4628,11 @@
       }
       if (ui.mode === "PERFORM_WATCH") return { action: "perform_watch", payload: { watch: Math.random() < FOOD_VENDOR_AUTO_POLICY.watchRate } };
       if (ui.mode === "PERFORM_FORCED_PAY" || ui.mode === "PERFORM_BENEFIT") {
-        const canMoney = canPerformWatchPay(actor, "pay_money", !!ui.toggleWear);
+        const canMoney = canPerformWatchPay(actor, "pay_money", false);
         const payMoney = Math.random() < FOOD_VENDOR_AUTO_POLICY.payMoneyRate;
         return { action: ui.mode === "PERFORM_FORCED_PAY" ? "perform_forced_pay" : "perform_benefit", payload: { choice: (payMoney && canMoney) ? "pay_money" : "pay_curiosity" } };
       }
+      if (ui.mode === "PERFORM_FORCED_TOGGLE" || ui.mode === "PERFORM_TOGGLE") return { action: ui.mode === "PERFORM_FORCED_TOGGLE" ? "perform_forced_toggle" : "perform_toggle", payload: { toggle: false } };
       if (ui.mode === "EVENT_CARD7_TARGET") return { action: "event_card7_target", payload: { targetId: pickRoleTargetStrategic("role_food_vendor", ui.targets, FOOD_VENDOR_AUTO_POLICY) || ui.targets[0] } };
       if (ui.mode === "EVENT_CARD8_TARGET") return { action: "event_card8_target", payload: { targetId: pickRoleTargetStrategic("role_food_vendor", ui.targets, FOOD_VENDOR_AUTO_POLICY) || ui.targets[0] } };
       if (ui.mode === "EVENT_CARD12_TARGET") return { action: "event_card12_target", payload: { targetId: pickRoleTargetStrategic("role_food_vendor", ui.targets, FOOD_VENDOR_AUTO_POLICY) || ui.targets[0] } };
@@ -4364,6 +4642,16 @@
       if (ui.mode === "EVENT_CARD17_TARGET") return { action: "event_card17_target", payload: { targetId: pickRoleTargetStrategic("role_food_vendor", ui.targets, FOOD_VENDOR_AUTO_POLICY) || ui.targets[0] } };
       if (ui.mode === "EVENT_CARD19_TARGET") return { action: "event_card19_target", payload: { targetId: pickRoleTargetStrategic("role_food_vendor", ui.targets, FOOD_VENDOR_AUTO_POLICY) || ui.targets[0] } };
       if (ui.mode === "EVENT_CARD20_TARGET") return { action: "event_card20_target", payload: { targetId: pickRoleTargetStrategic("role_food_vendor", ui.targets, FOOD_VENDOR_AUTO_POLICY) || ui.targets[0] } };
+      if (ui.mode === "EVENT_CARD20_FOOD_SWAP_OFFER") {
+        const actor = findPlayer(ui.actor);
+        let offerKey = ui.offerItems[0];
+        if (actor && ui.offerItems.includes("product") && (actor.status.product || 0) > 0) offerKey = "product";
+        return { action: "event_card20_food_swap_offer", payload: { offerKey } };
+      }
+      if (ui.mode === "EVENT_CARD20_FOOD_SWAP_RECEIVE") {
+        const receiveKey = ui.receiveItems.includes("orange_product") ? "orange_product" : ui.receiveItems[0];
+        return { action: "event_card20_food_swap_receive", payload: { receiveKey } };
+      }
       return null;
     }
 
@@ -4384,10 +4672,11 @@
       if (ui.mode === "TURN_CONFIRM") return { action: "next_turn" };
       if (ui.mode === "PERFORM_WATCH") return { action: "perform_watch", payload: { watch: Math.random() < PERFORMER_AUTO_POLICY.watchRate } };
       if (ui.mode === "PERFORM_FORCED_PAY" || ui.mode === "PERFORM_BENEFIT") {
-        const canMoney = canPerformWatchPay(actor, "pay_money", !!ui.toggleWear);
+        const canMoney = canPerformWatchPay(actor, "pay_money", false);
         const payMoney = Math.random() < PERFORMER_AUTO_POLICY.payMoneyRate;
         return { action: ui.mode === "PERFORM_FORCED_PAY" ? "perform_forced_pay" : "perform_benefit", payload: { choice: (payMoney && canMoney) ? "pay_money" : "pay_curiosity" } };
       }
+      if (ui.mode === "PERFORM_FORCED_TOGGLE" || ui.mode === "PERFORM_TOGGLE") return { action: ui.mode === "PERFORM_FORCED_TOGGLE" ? "perform_forced_toggle" : "perform_toggle", payload: { toggle: false } };
       if (ui.mode === "EVENT_CARD7_TARGET") return { action: "event_card7_target", payload: { targetId: pickRoleTargetStrategic("role_performer", ui.targets, PERFORMER_AUTO_POLICY) || ui.targets[0] } };
       if (ui.mode === "EVENT_CARD8_TARGET") return { action: "event_card8_target", payload: { targetId: pickRoleTargetStrategic("role_performer", ui.targets, PERFORMER_AUTO_POLICY) || ui.targets[0] } };
       if (ui.mode === "EVENT_CARD12_TARGET") return { action: "event_card12_target", payload: { targetId: pickRoleTargetStrategic("role_performer", ui.targets, PERFORMER_AUTO_POLICY) || ui.targets[0] } };
@@ -4496,13 +4785,15 @@
         return { action: "perform_watch", payload: { watch } };
       }
       if (ui.mode === "PERFORM_FORCED_PAY" || ui.mode === "PERFORM_BENEFIT") {
-        const canWear = (actor.status.orange_product || 0) > 0 && (actor.status.orange_wear_product || 0) < FINN_AUTO_POLICY.wearGoal;
-        if (canWear && !ui.toggleWear) return { action: "perform_toggle_wear", payload: { toggle: true } };
-        const canMoney = canPerformWatchPay(actor, "pay_money", !!ui.toggleWear);
+        const canMoney = canPerformWatchPay(actor, "pay_money", false);
         const choice = FINN_AUTO_POLICY.watchPayPriority === "money"
           ? (canMoney ? "pay_money" : "pay_curiosity")
-          : (canPerformWatchPay(actor, "pay_curiosity", !!ui.toggleWear) ? "pay_curiosity" : "pay_money");
+          : (canPerformWatchPay(actor, "pay_curiosity", false) ? "pay_curiosity" : "pay_money");
         return { action: ui.mode === "PERFORM_FORCED_PAY" ? "perform_forced_pay" : "perform_benefit", payload: { choice } };
+      }
+      if (ui.mode === "PERFORM_FORCED_TOGGLE" || ui.mode === "PERFORM_TOGGLE") {
+        const canWear = (actor.status.orange_product || 0) > 0 && (actor.status.orange_wear_product || 0) < FINN_AUTO_POLICY.wearGoal;
+        return { action: ui.mode === "PERFORM_FORCED_TOGGLE" ? "perform_forced_toggle" : "perform_toggle", payload: { toggle: !!canWear } };
       }
       return null;
     }
@@ -4578,26 +4869,19 @@
       }
       if (ui.mode === "PERFORM_FORCED_PAY") {
         const watcher = findPlayer(ui.current);
-        const canToggle = watcher && (((watcher.status.orange_product || 0) > 0) || ((watcher.status.orange_wear_product || 0) > 0));
-        let toggle = !!ui.toggleWear && !!canToggle;
-        const finnWantsWear = watcher
-          && watcher.roleId === "role_finn"
-          && (watcher.status.orange_product || 0) > 0
-          && (watcher.status.orange_wear_product || 0) < 3;
-        if (finnWantsWear && !toggle) {
-          const canWearPay = canPerformWatchPay(watcher, "pay_money", true) || canPerformWatchPay(watcher, "pay_curiosity", true);
-          if (canWearPay) return { action: "perform_toggle_wear", payload: { toggle: true } };
-        }
-        const canPayMoney = watcher && canPerformWatchPay(watcher, "pay_money", toggle);
-        const canPayCuriosity = watcher && canPerformWatchPay(watcher, "pay_curiosity", toggle);
+        const canPayMoney = watcher && canPerformWatchPay(watcher, "pay_money", false);
+        const canPayCuriosity = watcher && canPerformWatchPay(watcher, "pay_curiosity", false);
         let choice = "pay_money";
         if (!canPayMoney && canPayCuriosity) choice = "pay_curiosity";
-        if (!canPayMoney && !canPayCuriosity && canToggle) {
-          const tCanPayMoney = watcher && canPerformWatchPay(watcher, "pay_money", !toggle);
-          const tCanPayCuriosity = watcher && canPerformWatchPay(watcher, "pay_curiosity", !toggle);
-          if (tCanPayMoney || tCanPayCuriosity) return { action: "perform_toggle_wear", payload: { toggle: !toggle } };
-        }
         return { action: "perform_forced_pay", payload: { choice } };
+      }
+      if (ui.mode === "PERFORM_FORCED_TOGGLE") {
+        const watcher = findPlayer(ui.current);
+        const canToggle = watcher && (((watcher.status.orange_product || 0) > 0) || ((watcher.status.orange_wear_product || 0) > 0));
+        const toggle = watcher && watcher.roleId === "role_finn"
+          ? ((watcher.status.orange_product || 0) > 0 && (watcher.status.orange_wear_product || 0) < 3)
+          : !!canToggle;
+        return { action: "perform_forced_toggle", payload: { toggle: !!toggle } };
       }
       if (ui.mode === "PERFORM_WATCH") {
         const block = isThreatening(ui.actor, 1);
@@ -4608,26 +4892,19 @@
       }
       if (ui.mode === "PERFORM_BENEFIT") {
         const watcher = findPlayer(ui.current);
-        const canToggle = watcher && (((watcher.status.orange_product || 0) > 0) || ((watcher.status.orange_wear_product || 0) > 0));
-        let toggle = !!ui.toggleWear && !!canToggle;
-        const finnWantsWear = watcher
-          && watcher.roleId === "role_finn"
-          && (watcher.status.orange_product || 0) > 0
-          && (watcher.status.orange_wear_product || 0) < 3;
-        if (finnWantsWear && !toggle) {
-          const canWearPay = canPerformWatchPay(watcher, "pay_money", true) || canPerformWatchPay(watcher, "pay_curiosity", true);
-          if (canWearPay) return { action: "perform_toggle_wear", payload: { toggle: true } };
-        }
-        const canPayMoney = watcher && canPerformWatchPay(watcher, "pay_money", toggle);
-        const canPayCuriosity = watcher && canPerformWatchPay(watcher, "pay_curiosity", toggle);
+        const canPayMoney = watcher && canPerformWatchPay(watcher, "pay_money", false);
+        const canPayCuriosity = watcher && canPerformWatchPay(watcher, "pay_curiosity", false);
         let choice = "pay_money";
         if (!canPayMoney && canPayCuriosity) choice = "pay_curiosity";
-        if (!canPayMoney && !canPayCuriosity && canToggle) {
-          const tCanPayMoney = watcher && canPerformWatchPay(watcher, "pay_money", !toggle);
-          const tCanPayCuriosity = watcher && canPerformWatchPay(watcher, "pay_curiosity", !toggle);
-          if (tCanPayMoney || tCanPayCuriosity) return { action: "perform_toggle_wear", payload: { toggle: !toggle } };
-        }
         return { action: "perform_benefit", payload: { choice } };
+      }
+      if (ui.mode === "PERFORM_TOGGLE") {
+        const watcher = findPlayer(ui.current);
+        const canToggle = watcher && (((watcher.status.orange_product || 0) > 0) || ((watcher.status.orange_wear_product || 0) > 0));
+        const toggle = watcher && watcher.roleId === "role_finn"
+          ? ((watcher.status.orange_product || 0) > 0 && (watcher.status.orange_wear_product || 0) < 3)
+          : !!canToggle;
+        return { action: "perform_toggle", payload: { toggle: !!toggle } };
       }
       if (ui.mode === "VOL_TARGET") return { action: "vol_target", payload: { targetId: pickTargetByThreat(ui.actor, ui.targets, false) || ui.targets[0] } };
       if (ui.mode === "VOL_TYPE") return { action: "vol_type", payload: { type: ui.helpTypes[0] } };
@@ -4656,7 +4933,13 @@
         return { action: "event_card7_target", payload: { targetId } };
       }
       if (ui.mode === "EVENT_CARD7_FINN_ITEM") return { action: "event_card7_finn_item", payload: { itemKey: ui.items[0] } };
-      if (ui.mode === "EVENT_CARD7_SWAP_CONSENT") return { action: "event_card7_swap_consent", payload: { agree: false } };
+      if (ui.mode === "EVENT_CARD7_SWAP_CONSENT") {
+        const target = findPlayer(ui.target);
+        if (ui.onRefuse === "money_by_target" && (target?.status?.money || 0) < 1) {
+          return { action: "event_card7_swap_consent", payload: { agree: true } };
+        }
+        return { action: "event_card7_swap_consent", payload: { agree: false } };
+      }
       if (ui.mode === "EVENT_CARD8_TARGET") {
         const actor = findPlayer(ui.actor);
         let targetId = pickTargetByThreat(ui.actor, ui.targets, true) || ui.targets[0];
@@ -4717,7 +5000,10 @@
         return { action: "event_card14_target", payload: { targetId } };
       }
       if (ui.mode === "EVENT_CARD14_VENDOR_ITEM") return { action: "event_card14_vendor_item", payload: { itemIndex: 0 } };
-      if (ui.mode === "EVENT_CARD14_VENDOR_CONSENT") return { action: "event_card14_vendor_consent", payload: { agree: false } };
+      if (ui.mode === "EVENT_CARD14_VENDOR_CONSENT") {
+        const agree = ui.canRefuse ? false : true;
+        return { action: "event_card14_vendor_consent", payload: { agree } };
+      }
       if (ui.mode === "EVENT_CARD15_TARGET") {
         const actor = findPlayer(ui.actor);
         let targetId = pickTargetByThreat(ui.actor, ui.targets, true) || ui.targets[0];
@@ -4734,6 +5020,12 @@
         const target = findPlayer(ui.target);
         const canSwap = actor && target && itemChoicesForSwap(actor).length > 0 && itemChoicesForSwap(target).length > 0;
         return { action: "event_card15_performer_choice", payload: { choice: canSwap ? "swap_target" : "get_product" } };
+      }
+      if (ui.mode === "EVENT_CARD15_VENDOR_SWAP_OFFER") {
+        return { action: "event_card15_vendor_swap_offer", payload: { offerKey: ui.offerItems[0] } };
+      }
+      if (ui.mode === "EVENT_CARD15_VENDOR_SWAP_RECEIVE") {
+        return { action: "event_card15_vendor_swap_receive", payload: { receiveKey: ui.receiveItems[0] } };
       }
       if (ui.mode === "EVENT_CARD16_FINN_CHOICE") {
         const actor = findPlayer(ui.actor);
@@ -4773,6 +5065,8 @@
         return { action: "event_card20_performer_choice", payload: { choice } };
       }
       if (ui.mode === "EVENT_CARD20_VENDOR_ITEM") return { action: "event_card20_vendor_item", payload: { itemIndex: 0 } };
+      if (ui.mode === "EVENT_CARD20_FOOD_SWAP_OFFER") return { action: "event_card20_food_swap_offer", payload: { offerKey: ui.offerItems[0] } };
+      if (ui.mode === "EVENT_CARD20_FOOD_SWAP_RECEIVE") return { action: "event_card20_food_swap_receive", payload: { receiveKey: ui.receiveItems[0] } };
       // Keep auto/manual behavior aligned: if a UI mode is missing here,
       // do not auto-skip the turn (manual mode cannot skip hidden branches).
       return null;
@@ -4947,40 +5241,38 @@
       }
       if (ui.mode === "PERFORM_FORCED_PAY") {
         const watcher = findPlayer(ui.current);
-        const canToggle = watcher && (((watcher.status.orange_product || 0) > 0) || ((watcher.status.orange_wear_product || 0) > 0));
-        const toggle = !!ui.toggleWear && !!canToggle;
-        const canPayMoney = watcher && canPerformWatchPay(watcher, "pay_money", toggle);
-        const canPayCuriosity = watcher && canPerformWatchPay(watcher, "pay_curiosity", toggle);
-        if (canToggle) {
-          const toggleLabel = (watcher.status.orange_product || 0) > 0 ? "本次围观：穿上👑" : "本次围观：脱下🤴🏻";
-          addAction(toggleLabel, "perform_toggle_wear", { toggle: !toggle }, "secondary");
-        }
-        if (watcher && watcher.roleId === "role_finn" && toggle && (watcher.status.orange_product || 0) > 0) {
-          addAction(`${roleName(ui.current)} 支付 ❤️-2`, "perform_forced_pay", { choice: "pay_money" }, "secondary", !!canPayMoney);
-          addAction(`${roleName(ui.current)} 支付 🔍-4`, "perform_forced_pay", { choice: "pay_curiosity" }, "secondary", !!canPayCuriosity);
-          return;
-        }
+        const canPayMoney = watcher && canPerformWatchPay(watcher, "pay_money", false);
+        const canPayCuriosity = watcher && canPerformWatchPay(watcher, "pay_curiosity", false);
         addAction(`${roleName(ui.current)} 支付 💰-1`, "perform_forced_pay", { choice: "pay_money" }, "secondary", !!canPayMoney);
         addAction(`${roleName(ui.current)} 支付 🔍-2`, "perform_forced_pay", { choice: "pay_curiosity" }, "secondary", !!canPayCuriosity);
         return;
       }
-      if (ui.mode === "PERFORM_BENEFIT") {
+      if (ui.mode === "PERFORM_FORCED_TOGGLE") {
         const watcher = findPlayer(ui.current);
         const canToggle = watcher && (((watcher.status.orange_product || 0) > 0) || ((watcher.status.orange_wear_product || 0) > 0));
-        const toggle = !!ui.toggleWear && !!canToggle;
-        const canPayMoney = watcher && canPerformWatchPay(watcher, "pay_money", toggle);
-        const canPayCuriosity = watcher && canPerformWatchPay(watcher, "pay_curiosity", toggle);
         if (canToggle) {
-          const toggleLabel = (watcher.status.orange_product || 0) > 0 ? "本次围观：穿上👑" : "本次围观：脱下🤴🏻";
-          addAction(toggleLabel, "perform_toggle_wear", { toggle: !toggle }, "secondary");
+          const toggleLabel = (watcher.status.orange_product || 0) > 0 ? "穿上👑" : "脱下🤴🏻";
+          addAction(`${roleName(ui.current)} ${toggleLabel}`, "perform_forced_toggle", { toggle: true }, "secondary");
         }
-        if (watcher && watcher.roleId === "role_finn" && toggle && (watcher.status.orange_product || 0) > 0) {
-          addAction("支付 ❤️-2 围观", "perform_benefit", { choice: "pay_money" }, "secondary", !!canPayMoney);
-          addAction("支付 🔍-4 围观", "perform_benefit", { choice: "pay_curiosity" }, "secondary", !!canPayCuriosity);
-          return;
-        }
+        addAction(`${roleName(ui.current)} 保持不变`, "perform_forced_toggle", { toggle: false }, canToggle ? "" : "secondary");
+        return;
+      }
+      if (ui.mode === "PERFORM_BENEFIT") {
+        const watcher = findPlayer(ui.current);
+        const canPayMoney = watcher && canPerformWatchPay(watcher, "pay_money", false);
+        const canPayCuriosity = watcher && canPerformWatchPay(watcher, "pay_curiosity", false);
         addAction("支付 💰-1 围观", "perform_benefit", { choice: "pay_money" }, "secondary", !!canPayMoney);
         addAction("支付 🔍-2 围观", "perform_benefit", { choice: "pay_curiosity" }, "secondary", !!canPayCuriosity);
+        return;
+      }
+      if (ui.mode === "PERFORM_TOGGLE") {
+        const watcher = findPlayer(ui.current);
+        const canToggle = watcher && (((watcher.status.orange_product || 0) > 0) || ((watcher.status.orange_wear_product || 0) > 0));
+        if (canToggle) {
+          const toggleLabel = (watcher.status.orange_product || 0) > 0 ? "穿上👑" : "脱下🤴🏻";
+          addAction(`${toggleLabel}`, "perform_toggle", { toggle: true }, "secondary");
+        }
+        addAction("保持不变", "perform_toggle", { toggle: false }, canToggle ? "" : "secondary");
         return;
       }
       if (ui.mode === "EVENT_TOURIST_GIFT") {
@@ -5017,7 +5309,15 @@
       }
       if (ui.mode === "EVENT_CARD7_SWAP_CONSENT") {
         addAction(`${roleName(ui.target)} 同意交换`, "event_card7_swap_consent", { agree: true }, "secondary");
-        addAction(`${roleName(ui.target)} 拒绝交换`, "event_card7_swap_consent", { agree: false });
+        const target = findPlayer(ui.target);
+        const canRefuse = !(ui.onRefuse === "money_by_target" && (target?.status?.money || 0) < 1);
+        addAction(
+          canRefuse ? `${roleName(ui.target)} 拒绝交换` : `${roleName(ui.target)} 无法拒绝（💰不足）`,
+          "event_card7_swap_consent",
+          { agree: false },
+          "",
+          canRefuse
+        );
         return;
       }
       if (ui.mode === "EVENT_CARD8_TARGET") {
@@ -5129,6 +5429,14 @@
         addAction("与目标交换（不可拒绝）", "event_card15_performer_choice", { choice: "swap_target" }, "primary");
         return;
       }
+      if (ui.mode === "EVENT_CARD15_VENDOR_SWAP_OFFER") {
+        ui.offerItems.forEach((k) => addAction(`用 1 ${k} 交换`, "event_card15_vendor_swap_offer", { offerKey: k }, "secondary"));
+        return;
+      }
+      if (ui.mode === "EVENT_CARD15_VENDOR_SWAP_RECEIVE") {
+        ui.receiveItems.forEach((k) => addAction(`换取 1 ${k}`, "event_card15_vendor_swap_receive", { receiveKey: k }, "primary"));
+        return;
+      }
       if (ui.mode === "EVENT_CARD16_FINN_CHOICE") {
         addAction("获得 1👑", "event_card16_finn_choice", { choice: "get_orange" }, "secondary");
         addAction("穿戴 1👑", "event_card16_finn_choice", { choice: "wear_orange" }, "primary");
@@ -5136,6 +5444,10 @@
       }
       if (ui.mode === "EVENT_CARD16_TOURIST_TARGET") {
         ui.targets.forEach((id) => addAction(`拍 ${roleName(id)}`, "event_card16_tourist_target", { targetId: id }, "primary"));
+        return;
+      }
+      if (ui.mode === "EVENT_CARD16_VENDOR_ITEM") {
+        ui.items.forEach((it, idx) => addAction(`卖 ${it.label} 给游客`, "event_card16_vendor_item", { itemIndex: idx }, "primary"));
         return;
       }
       if (ui.mode === "EVENT_CARD17_TARGET") {
@@ -5174,6 +5486,14 @@
       }
       if (ui.mode === "EVENT_CARD20_VENDOR_ITEM") {
         ui.items.forEach((it, idx) => addAction(`交易 ${it.label}`, "event_card20_vendor_item", { itemIndex: idx }, "primary"));
+        return;
+      }
+      if (ui.mode === "EVENT_CARD20_FOOD_SWAP_OFFER") {
+        ui.offerItems.forEach((k) => addAction(`用 1 ${k} 交换`, "event_card20_food_swap_offer", { offerKey: k }, "secondary"));
+        return;
+      }
+      if (ui.mode === "EVENT_CARD20_FOOD_SWAP_RECEIVE") {
+        ui.receiveItems.forEach((k) => addAction(`换取 1 ${k}`, "event_card20_food_swap_receive", { receiveKey: k }, "primary"));
         return;
       }
       if (ui.mode === "VOL_TARGET") {
