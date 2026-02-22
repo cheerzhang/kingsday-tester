@@ -13,8 +13,12 @@
 - Photo reward:
   - Target of photo gains `+1 product` (photo item).
 - Performance watcher reward:
-  - Watcher gains `+1 curiosity`.
-  - If watcher has orange item, watcher may also wear `1` orange item.
+  - Watcher must choose one watch cost:
+  - pay `💰-1`, or pay `🔍-2`.
+  - Performer gains `💰+1` from each watcher.
+  - Watcher can choose to toggle orange wear status while watching:
+  - `👑 -> 🤴🏻` (wear) or `🤴🏻 -> 👑` (take off).
+  - Finn special rule: if Finn wears orange via watching (`👑 -> 🤴🏻`), Finn pays `❤️-2` or `🔍-4` instead of normal watch cost.
 
 ---
 
@@ -23,6 +27,17 @@
 - Draw cost: `THEN / stamina-1 | curiosity-1` (auto takes first payable option).
 - Skill: ask one player with orange item; if accepted, Finn wears `+1` orange and gains `⭐️+1`.
 - Win: wear `3` orange items (`🤴🏻 >= 3`).
+- Auto strategy (synced to game logic):
+  - Turn choice: prefer `Use Skill`; if no skill value, then `Draw`.
+  - Draw payment: normally pay `❤️`; switch to `🔍` when `❤️ <= 1`.
+  - Target selection: prioritize players closest to winning; tie-break by lower orange stock.
+  - Consent policy: if another player asks Finn-side consent to help Finn wear, default `Refuse` when refusal is allowed.
+  - Watching performance:
+    - Prefer to watch if it can trigger wear (`👑 -> 🤴🏻`) or if `🔍 <= 1`.
+    - Prefer paying watch cost by `💰`, fallback to `🔍`.
+  - Card choices:
+    - Prefer choices that convert current `👑` into worn progress until `🤴🏻=3`.
+    - On card 8 item choice, prefer `📦` over extra `👑` to avoid dead stock.
 
 ## 2) Tourist
 - Initial: `🔍2 💰6 ❤️4 📦1 👑0 🤴🏻0`
@@ -30,7 +45,13 @@
 - Skill: choose target and request photo consent (Finn is forced-consent).
   - On shoot: tourist pays `💰-1 ❤️-1`, target gets `📦+1`.
   - Valid photo only if target is wearing orange (`🤴🏻 > 0`), then tourist gains `⭐️+1`.
-- Win: `5` valid photos (same tourist can photo Finn only once).
+- Win: `3` valid photos (same tourist can photo Finn only once).
+- Auto strategy (synced to game logic):
+  - Turn choice: skill-first if a valid photo line exists; otherwise draw.
+  - Draw payment: strongly prefer spending `🔍` over `💰`.
+  - Photo targeting: prioritize `🤴🏻` target first, then orange-related targets.
+  - Consent policy: if target can refuse a tourist photo/request, default `Refuse`.
+  - Watching payment: mostly pay `💰`, fallback `🔍`.
 
 ## 3) Vendor
 - Initial: `🔍2 💰0 ❤️6 📦2 👑1 🤴🏻0`
@@ -40,6 +61,12 @@
   - Orange item base price: `2`
   - Event effect may add orange price bonus.
 - Win: `3` valid trades.
+- Auto strategy (synced to game logic):
+  - Turn choice: trade-first when there are likely buyers; otherwise draw.
+  - Trade item: choose item by expected successful buyers and price yield.
+  - Trade partner: prefer targets with purchase capability and lower refusal risk.
+  - Refuse policy: limited anti-leader refusal (low-medium probability).
+  - Watching payment: prefer `💰`, fallback `🔍`.
 
 ## 4) Food Vendor
 - Initial: `🔍3 💰0 ❤️1 📦0 👑0 🤴🏻0`
@@ -54,17 +81,30 @@
     - may be multiplied by event effect.
 - Win: `5` successful servings total.
   - Self-serving is counted at most once.
+- Auto strategy (synced to game logic):
+  - Turn choice: supply-first when start condition is met (`❤️>=2`); otherwise draw.
+  - Supply accept/deny: accept when buyer-side payment is feasible; slight anti-leader suppression.
+  - Event target choice: threat-aware targeting (higher pressure on near-win targets).
+  - Watching payment: prefer `💰`, fallback `🔍`.
 
 ## 5) Performer
 - Initial: `🔍2 💰1 ❤️6 📦0 👑1 🤴🏻1`
 - Draw cost: `THEN / money-1 | stamina-1`
 - Skill: requires wearing orange (`🤴🏻 >= 1`) before start.
   - Ask players to watch.
-  - Each watcher gains `🔍+1`, and may wear orange if available.
+  - Each watcher chooses watch cost: `💰-1` or `🔍-2`.
+  - Performer gains `💰+1` per watcher.
+  - Watcher may choose to wear/take off one orange item during watching.
+  - Finn wearing via watching uses special cost: `❤️-2` or `🔍-4`.
   - Success threshold: `>=2` watchers (unless event overrides to `1`).
   - Success: performer `❤️-2`, `⭐️+1`.
   - Fail: performer `❤️-1`.
 - Win: `3` successful performances.
+- Auto strategy (synced to game logic):
+  - Turn choice: strong perform-first preference once perform is available.
+  - Event target choice: strong threat-focused target selection.
+  - Watching behavior: high watch participation.
+  - Watching payment: prefer `💰`, fallback `🔍`.
 
 ## 6) Volunteer
 - Initial: `🔍2 💰5 ❤️2 📦1 👑0 🤴🏻0`
@@ -77,7 +117,7 @@
 
 ---
 
-## Events (Cards 1-12)
+## Events (Cards 1-20)
 
 ## Card 1: Orange Crown
 - Global: Drawer gains `👑+1`.
@@ -178,7 +218,9 @@
 
 ## Card 11: NONSTOP APPLAUSE
 - Global (drawer only): gain `❤️+1` and `🔍+1`.
-- Finn: gain `👑+1` and `❤️+1`.
+- Finn: choose one:
+  - gain `👑+1`, or
+  - wear `1` orange item.
 - Performer: start a performance, and gain `+1` performance success immediately.
 - Tourist: attempt `1` photo of the performer.
   - If performer has no `📦`, performer cannot refuse this photo.
@@ -194,6 +236,89 @@
 - Tourist: attempt `1` photo of target.
   - If refused, target `❤️-1`.
 - Vendor: trade with target.
-  - If refused, target `❤️-1`.
+  - Target can't refuse.
 - Food Vendor: start supply to target.
   - If refused, food vendor `❤️+2`, and target `❤️-1`.
+
+## Card 13: Photos Everwhere
+- Global (all): all players choose whether to participate.
+  - Each participant gains `🔍+1`.
+- Finn: if Finn participates, gain extra `🔍+2`.
+- Food Vendor: supply to target (cannot refuse); if successful, gain `⭐+1`.
+- Performer: if target has `👑` and `🤴🏻`, start perform with no cost; target must join.
+- Vendor: trade with target (cannot refuse).
+- Tourist: if `2+` players participate, attempt `1` photo.
+
+## Card 14: TAKE ME A PHOTO?
+- Global: choose another player as target; target gains `🔍+1`.
+- Finn: target gives `1` orange item (`👑`) to Finn if target has one.
+- Food Vendor: start supply to target; target can't refuse.
+- Performer: start perform; target must watch.
+- Vendor: trade with target.
+  - If target has no worn orange (`🤴🏻`), target can't refuse.
+- Tourist: attempt `1` photo of target; can't be refused.
+
+## Card 15: Secretly filming
+- Global: choose another player as target; target gains `🔍+2`.
+- Finn: choose one:
+  - Get `1` common item (`📦+1`).
+  - Wear `1` orange item.
+- Food Vendor: provide `1` food to target.
+  - Target pays `1` orange item (`👑`) if target has one.
+- Vendor: swap with target (cannot refuse).
+- Performer: choose one:
+  - Get `1` common item (`📦+1`).
+  - Swap with target (cannot refuse).
+- Tourist: take `1` photo of target.
+  - Target cannot refuse, and target gains `💰+2`.
+
+## Card 16: PERFECT SHOT
+- Global (drawer only): gain `💰+1`.
+- Finn: choose one:
+  - Get `1` orange item (`👑+1`).
+  - Wear `1` orange item.
+- Food Vendor: supply now.
+  - Food effect this round is `❤️+2`.
+- Vendor: get `📦+1`.
+- Performer: get `❤️+2`.
+- Tourist: take `1` photo; target can't refuse.
+  - Target gets `1` common item (`📦+1`) from photo.
+
+## Card 17: LET'S GRAB A BITE
+- Global: choose another player as target; target gains `📦+2`.
+- Finn: gain `🔍+2`.
+- Food Vendor: start supply with no cost; target can't refuse.
+- Performer: wear `1` orange item.
+- Vendor: trade to target; target can't refuse.
+- Tourist: gain `💰+1` and `🔍+1`.
+
+## Card 18: SMELLS DELICIOUS
+- Global (drawer only): pay `💰-1`, gain `👑+1`.
+- Finn: choose one:
+  - Pay `🔍-1`, get `👑+1`.
+  - Pay `🔍-2`, wear `1` orange item.
+- Food Vendor: pay `❤️-1`, get `📦+1`.
+- Performer: pay `🔍-1`, get `📦+1`.
+- Vendor: start trade with one player.
+  - If vendor is wearing orange, target can't refuse.
+- Tourist: pay `👑-1`, take `1` photo, cannot be refused.
+
+## Card 19: LONG LINE
+- Global: choose another player as target; target and drawer gain `❤️+2`.
+- Finn: ask target to give Finn `1` orange item and help Finn wear it; can't be refused.
+- Food Vendor: start supply to target; target can't refuse.
+- Performer: wear `1` orange item.
+- Vendor: trade to target; target can't refuse.
+  - After trade, target pays `❤️-1`.
+- Tourist: ask target to wear `1` orange item, then take `1` photo; can't be refused.
+
+## Card 20: LAST SERVING
+- Global: choose another player as target; target and drawer gain `👑+1`.
+- Finn: wear `1` orange item with no cost.
+- Food Vendor: start a swap with target; target can't refuse.
+- Performer: choose one:
+  - Pay `👑-1`, get `📦+1`.
+  - Pay `👑-1`, get `❤️+1`.
+- Vendor: trade to target; target can't refuse.
+  - Target pays `👑-1` after trade.
+- Tourist: ask target to wear `1` orange item, then take `1` photo; can't be refused.
