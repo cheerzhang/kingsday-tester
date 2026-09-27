@@ -114,7 +114,7 @@ function renderGame() {
   document.querySelectorAll('[data-action]').forEach(b=>b.onclick=()=>{const a=s.actions[Number(b.dataset.action)];take(a,true);});
   document.getElementById('pace').onclick=()=>{speed=speed===1?2:1;renderGame();};
   document.getElementById('journal').onclick=()=>showSheet(`<span class="eyebrow">TABLE JOURNAL</span><h2>这一局的故事</h2><p>${esc(feed)}</p><details open><summary>原始结算记录</summary><div class="logs">${esc(text(s.logs.join('\n')))}</div></details>`);
-  if(event)document.getElementById('event-info').onclick=()=>showSheet(`<span class="eyebrow">EVENT ${n} / 20</span><h2>${eventNames[n-1]}</h2><p>${globals[n-1]}</p><h3>${esc(s.lastEventInfo?.actorName)} 的角色效果</h3><p>${esc(s.lastEventInfo?.selfDesc||'无额外效果')}</p><details><summary>原卡英文说明</summary><p>${esc(s.lastEventInfo?.title)}\n${esc(s.lastEventInfo?.globalDesc)}</p></details>`);
+  if(event)document.getElementById('event-info').onclick=()=>showSheet(`<span class="eyebrow">EVENT ${n} / 20</span><h2>${eventNames[n-1]}</h2><p>${globals[n-1]}</p><h3>${esc(s.lastEventInfo?.actorName)} 的角色效果</h3><p>${esc(window.KingsdayCardCopy?.[n-1]?.[ids.indexOf(turn.roleId)] || (turn.roleId==='role_volunteer' && n===4 ? '获得 1 件橙色物品。' : '无额外角色效果。'))}</p><details><summary>原卡英文说明</summary><p>${esc(s.lastEventInfo?.title)}\n${esc(s.lastEventInfo?.globalDesc)}\n${esc(s.lastEventInfo?.selfDesc)}</p></details>`);
   persist();schedule();
 }
 function pass(id) {
